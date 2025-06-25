@@ -3,32 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tenant Info (Debug)</title>
+  <title>Tenant Info</title>
   <style>
-    body { font-family: sans-serif; background: #fafafa; padding:20px; text-align:center; }
-    input, button { font-size:1.2rem; padding:0.8rem; margin:0.5rem; width:90%; max-width:360px; }
-    button { background:#007bff; color:#fff; border:none; border-radius:6px; }
-    .card { background:#fff; padding:1rem; margin:1rem auto; max-width:360px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.1); text-align:left; }
-    .label { font-weight:bold; }
-    pre { text-align:left; background:#eee; padding:1rem; border-radius:6px; max-width:360px; margin:auto; overflow-x:auto; }
+    body {
+      margin: 0;
+      padding: 1rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f2f2f7;
+      color: #1c1c1e;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    input, button {
+      width: 100%;
+      max-width: 360px;
+      font-size: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #007aff;
+      color: #fff;
+      border: none;
+    }
+    #result {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 0.75rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .card p {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+    .label {
+      font-weight: 600;
+      color: #555;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .card { background: #1c1c1e; box-shadow: 0 2px 8px rgba(255,255,255,0.1); }
+      input, button { border: 1px solid #444; }
+      button { background: #0a84ff; }
+    }
   </style>
 </head>
 <body>
   <h1>Tenant Info</h1>
-  <button onclick="startVoice()">🎤 Speak Name</button><br>
-  <input id="textInput" placeholder="Or type name here" oninput="fetchData(this.value)">
-  
+  <div class="controls">
+    <button onclick="startVoice()">🎤 Speak Name</button>
+    <input id="textInput" type="text" placeholder="Or type name here" oninput="fetchData(this.value)">
+  </div>
   <div id="result"></div>
-  <h2>Debug Log</h2>
-  <pre id="debug">Waiting for results…</pre>
 
   <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyeN8uRT39cCWFHFvy_tq-aPoECb3OQzw37Z31Fvc9Ealojq7DcbdabmmXQKvLs4ONFtg/exec';
-
-    // Поймаем ошибки JS
-    window.onerror = function(msg, src, line) {
-      document.getElementById('debug').textContent = 'JS Error: ' + msg;
-    };
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTKfP82ugNzpMXDUjZxLUdd-9-h998jVxdMtOtC0VaBX_ZkJs8RlpXTmIAsSyECm1qpw/exec';
 
     function cleanUp() {
       const old = document.getElementById('jsonp-script');
@@ -37,35 +86,27 @@
 
     function fetchData(query) {
       cleanUp();
-      document.getElementById('debug').textContent = 'Loading…';
-      document.getElementById('result').innerHTML = '';
-      if (!query) {
-        document.getElementById('debug').textContent = 'Enter a name to search.';
-        return;
-      }
-      const cb = 'handleResponse';
+      const container = document.getElementById('result');
+      container.innerHTML = '';
+      if (!query.trim()) return;
+      const cb = 'renderResponse';
       window[cb] = function(res) {
-        renderResults(res.data || [], res.error);
-        renderDebug(res.debug, res.error);
+        renderCards(res.data || []);
         cleanUp();
       };
-      const s = document.createElement('script');
-      s.id  = 'jsonp-script';
-      s.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=handleResponse`;
-      document.body.appendChild(s);
+      const script = document.createElement('script');
+      script.id = 'jsonp-script';
+      script.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=${cb}`;
+      document.body.appendChild(script);
     }
 
-    function renderResults(rows, error) {
-      const c = document.getElementById('result');
-      if (error) {
-        c.innerHTML = `<p style="color:red;">Error: ${error}</p>`;
-        return;
-      }
+    function renderCards(rows) {
+      const container = document.getElementById('result');
+      container.innerHTML = '';
       if (!rows.length) {
-        c.innerHTML = '<p>No results found.</p>';
+        container.innerHTML = '<p style="text-align:center;">No results found.</p>';
         return;
       }
-      c.innerHTML = '';
       rows.forEach(r => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -73,27 +114,16 @@
           <p><span class="label">Name:</span> ${r[1]}</p>
           <p><span class="label">Address:</span> ${r[5]}</p>
           <p><span class="label">Phone:</span> ${r[7]}</p>
-          <p><span class="label">Account:</span> ${r[8]}</p>
+          <p><span class="label">Account #:</span> ${r[8]}</p>
           <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
-        c.appendChild(card);
+        container.appendChild(card);
       });
-    }
-
-    function renderDebug(debug, error) {
-      const pre = document.getElementById('debug');
-      if (error) {
-        pre.textContent = `Error logged on server: ${error}`;
-      } else if (debug) {
-        pre.textContent = JSON.stringify(debug, null, 2);
-      } else {
-        pre.textContent = 'No debug info.';
-      }
     }
 
     function startVoice() {
       if (!('webkitSpeechRecognition' in window)) {
-        alert('Voice not supported.');
+        alert('Voice not supported. Please type.');
         return;
       }
       const rec = new webkitSpeechRecognition();
