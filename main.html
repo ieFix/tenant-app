@@ -27,7 +27,9 @@
         placeholder="Search by name, address, account..."
         autocomplete="off"
         enterkeyhint="search"
+        maxlength="100"
       >
+      <button class="language-toggle" id="languageButton">EN</button>
       <button class="voice-search" id="voiceButton">
         <i class="fas fa-microphone"></i>
       </button>
@@ -74,6 +76,9 @@
         </div>
         <div class="suggestion">
           <i class="fas fa-sync"></i> Change search mode
+        </div>
+        <div class="suggestion">
+          <i class="fas fa-globe"></i> Switch recognition language
         </div>
       </div>
     </div>

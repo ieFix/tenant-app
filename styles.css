@@ -472,3 +472,48 @@ body {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
+
+/* Language toggle */
+.language-toggle {
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  width: 40px;
+  height: 30px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.language-toggle:hover {
+  background-color: var(--primary-light);
+}
+
+/* iOS specific adjustments */
+@supports (-webkit-touch-callout: none) {
+  .search-input {
+    padding-right: 110px; /* Space for buttons */
+  }
+}
+
+/* Android specific adjustments */
+@supports (-webkit-overflow-scrolling: touch) and (not (-webkit-touch-callout: none)) {
+  .search-input {
+    padding-right: 100px;
+  }
+}
+
+/* Suggestion item for language */
+.suggestion i.fa-globe {
+  color: var(--primary);
+}
