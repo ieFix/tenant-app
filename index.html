@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Арендатор Инфо</title>
   <style>
@@ -38,27 +39,30 @@
   <div id="result"></div>
 
   <script>
-    // Запрос к Apps Script
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTt9Xj6nMVeOGECaWLPiAZn512U-PCBgRkJSklpYVtgibUCBApJJ4cjcWIL0q9ogVfrA/exec";
+
     async function fetchData(query) {
-      if (!query) return;
-      const scriptURL = "https://script.google.com/macros/s/AKfycbxVYO_UIOuUZyNhmykNP1BTyxvw0ShWqcKHfgP0wHVZXlR5_lCXJ_IDJAcD9sRHaSQiiQ/exec?query=" + encodeURIComponent(query);
+      if (!query) {
+        document.getElementById("result").innerHTML = "";
+        return;
+      }
       try {
-        const response = await fetch(scriptURL);
-        const data = await response.json();
+        const res = await fetch(SCRIPT_URL + "?query=" + encodeURIComponent(query));
+        if (!res.ok) throw new Error(res.status + " " + res.statusText);
+        const data = await res.json();
         displayResult(data);
-      } catch (error) {
-        document.getElementById("result").innerHTML = "Ошибка: " + error.message;
+      } catch (e) {
+        document.getElementById("result").innerHTML = "Ошибка: " + e.message;
       }
     }
 
-    // Голосовой ввод (Web Speech API)
     function startVoice() {
       if (!('webkitSpeechRecognition' in window)) {
         alert("Голос не поддерживается. Используйте текст.");
         return;
       }
       const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'en-IE'; // Ирландский акцент
+      recognition.lang = 'en-IE';
       recognition.onresult = (e) => {
         const query = e.results[0][0].transcript;
         document.getElementById("textInput").value = query;
@@ -67,9 +71,8 @@
       recognition.start();
     }
 
-    // Вывод результата
     function displayResult(data) {
-      if (data.length === 0) {
+      if (!data || data.length === 0) {
         document.getElementById("result").innerHTML = "Ничего не найдено";
         return;
       }
@@ -77,9 +80,9 @@
       data.forEach(row => {
         html += `
           <p><b>Имя:</b> ${row[1]}</p>
-          <p><b>Адрес:</b> ${row[4]}</p>
-          <p><b>Телефон:</b> ${row[6]}</p>
-          <p><b>Счет:</b> ${row[7]} (оформлен на: ${row[8]})</p>
+          <p><b>Адрес:</b> ${row[5]}</p>
+          <p><b>Телефон:</b> ${row[7]}</p>
+          <p><b>Счет:</b> ${row[8]} (оформлен на: ${row[9]})</p>
           <hr>
         `;
       });
