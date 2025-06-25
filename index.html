@@ -11,24 +11,25 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #f2f2f7;
       color: #1c1c1e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     h1 {
-      text-align: center;
       font-size: 1.8rem;
       margin-bottom: 1rem;
     }
     .controls {
+      width: 100%;
+      max-width: 360px;
       display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      align-items: center;
+      gap: 0.5rem;
       margin-bottom: 1rem;
     }
     input, button {
-      width: 100%;
-      max-width: 360px;
+      flex: 1;
       font-size: 1rem;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem;
       border-radius: 0.5rem;
       border: 1px solid #ccc;
     }
@@ -36,8 +37,15 @@
       background: #007aff;
       color: #fff;
       border: none;
+      max-width: 100px;
+    }
+    #loader {
+      display: none;
+      margin: 1rem;
     }
     #result {
+      width: 100%;
+      max-width: 360px;
       display: flex;
       flex-direction: column;
       gap: 1rem;
@@ -71,40 +79,76 @@
 <body>
   <h1>Tenant Info</h1>
   <div class="controls">
-    <button onclick="startVoice()">🎤 Speak Name</button>
-    <input id="textInput" type="text" placeholder="Or type name here" oninput="fetchData(this.value)">
+    <button onclick="startVoice()">🎤</button>
+    <input id="textInput" type="text" placeholder="Name or Eircode" oninput="onInput()" />
   </div>
+  <div id="loader">🔄 Loading...</div>
   <div id="result"></div>
 
   <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTKfP82ugNzpMXDUjZxLUdd-9-h998jVxdMtOtC0VaBX_ZkJs8RlpXTmIAsSyECm1qpw/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyg0-i__opF28Umw7e3C5CgXYDVJ3L5nvat_5eZSLfx7IYFHbVBRkzw24RwIwojZpza_g/exec';
+    const CACHE_KEY = 'tenantData';
+    const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-    function cleanUp() {
-      const old = document.getElementById('jsonp-script');
-      if (old) old.remove();
+    let cache = null;
+
+    // Load or refresh cache
+    async function loadCache() {
+      const stored = localStorage.getItem(CACHE_KEY);
+      if (stored) {
+        const { ts, data } = JSON.parse(stored);
+        if (Date.now() - ts < CACHE_TIME) {
+          cache = data;
+          return;
+        }
+      }
+      // fetch full data via JSONP
+      return new Promise(resolve => {
+        window['cacheCallback'] = resp => {
+          cache = resp.data;
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cache }));
+          cleanup('cacheCallback');
+          resolve();
+        };
+        const s = document.createElement('script');
+        s.src = `${SCRIPT_URL}?callback=cacheCallback`;
+        document.body.appendChild(s);
+      });
     }
 
-    function fetchData(query) {
-      cleanUp();
-      const container = document.getElementById('result');
-      container.innerHTML = '';
-      if (!query.trim()) return;
-      const cb = 'renderResponse';
-      window[cb] = function(res) {
-        renderCards(res.data || []);
-        cleanUp();
-      };
-      const script = document.createElement('script');
-      script.id = 'jsonp-script';
-      script.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=${cb}`;
-      document.body.appendChild(script);
+    function cleanup(cb) {
+      const el = document.querySelector(`script[src*="${cb}"]`);
+      if (el) el.remove();
+      delete window[cb];
+    }
+
+    function onInput() {
+      const q = document.getElementById('textInput').value.trim().toLowerCase();
+      if (!cache) {
+        document.getElementById('loader').style.display = 'block';
+        loadCache().then(() => { document.getElementById('loader').style.display = 'none'; filterAndRender(q); });
+      } else {
+        filterAndRender(q);
+      }
+    }
+
+    function filterAndRender(query) {
+      document.getElementById('loader').style.display = 'none';
+      const rows = query
+        ? cache.filter(r =>
+            r[1].toString().toLowerCase().includes(query) ||
+            r[5].toString().toLowerCase().includes(query) ||
+            r[6].toString().toLowerCase().includes(query)
+          )
+        : [];
+      renderCards(rows);
     }
 
     function renderCards(rows) {
-      const container = document.getElementById('result');
-      container.innerHTML = '';
+      const c = document.getElementById('result');
+      c.innerHTML = '';
       if (!rows.length) {
-        container.innerHTML = '<p style="text-align:center;">No results found.</p>';
+        c.innerHTML = '<p style="text-align:center;">No results found.</p>';
         return;
       }
       rows.forEach(r => {
@@ -112,30 +156,29 @@
         card.className = 'card';
         card.innerHTML = `
           <p><span class="label">Name:</span> ${r[1]}</p>
-          <p><span class="label">PPSN:</span> ${r[2]}</p>
           <p><span class="label">Address:</span> ${r[5]}</p>
+          <p><span class="label">Eircode:</span> ${r[6]}</p>
           <p><span class="label">Phone:</span> ${r[7]}</p>
           <p><span class="label">Account #:</span> ${r[8]}</p>
           <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
-        container.appendChild(card);
+        c.appendChild(card);
       });
     }
 
     function startVoice() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert('Voice not supported. Please type.');
-        return;
-      }
+      if (!('webkitSpeechRecognition' in window)) return alert('Voice not supported.');
       const rec = new webkitSpeechRecognition();
       rec.lang = 'en-IE';
       rec.onresult = e => {
-        const txt = e.results[0][0].transcript;
-        document.getElementById('textInput').value = txt;
-        fetchData(txt);
+        document.getElementById('textInput').value = e.results[0][0].transcript;
+        onInput();
       };
       rec.start();
     }
+
+    // Preload cache on page load
+    document.addEventListener('DOMContentLoaded', loadCache);
   </script>
 </body>
 </html>
