@@ -1,115 +1,122 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Арендатор Инфо</title>
+  <title>Tenant Info</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      max-width: 90%;
-      margin: 20px auto;
+      font-family: sans-serif;
+      background: #f5f5f5;
+      color: #222;
       text-align: center;
+      padding: 30px;
     }
-    .btn {
-      padding: 20px;
-      font-size: 24px;
-      background: #ffff99;
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    input, button {
+      font-size: 1.5rem;
+      padding: 0.8rem;
+      margin: 0.5rem 0;
+      width: 90%;
+      max-width: 400px;
+      border: 2px solid #999;
+      border-radius: 8px;
+    }
+    button {
+      background: #0066cc;
+      color: white;
       border: none;
-      border-radius: 10px;
       cursor: pointer;
     }
-    input {
-      font-size: 24px;
-      width: 80%;
-      margin: 20px 0;
-      padding: 10px;
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
     }
     #result {
-      font-size: 24px;
-      margin-top: 20px;
+      margin-top: 1.5rem;
       text-align: left;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .card {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .label {
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h1>Арендатор Инфо</h1>
-  <button class="btn" onclick="startVoice()">🎤 Скажите имя</button>
-  <input
-    type="text"
-    id="textInput"
-    placeholder="Или введите имя"
-    oninput="fetchData(this.value)"
-  >
+  <h1>Tenant Info</h1>
+  <button id="voiceBtn" onclick="startVoice()">🎤 Speak Name</button>
+  <input id="textInput" type="text" placeholder="Or type name here" oninput="fetchData(this.value)">
   <div id="result"></div>
 
   <script>
-    // JSONP endpoint вашего Web App
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQmJN2WeHak4cMicIoF0t_YUuSeheq-XL3QOE7HLOzIPKHog4pV_WLGBPXj5aKkNMgOg/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw92-d9nEyBFe3ieiqa3hu_HEqWwLjer_ViZt8SVy49qeT2WSlLaJGacPSUmCsYf7p6bA/exec';
 
-    // Удаляем предыдущий JSONP-<script>
-    function cleanUpScript() {
-      const old = document.getElementById('jsonp');
+    function cleanUp() {
+      const old = document.getElementById('jsonp-script');
       if (old) old.remove();
     }
 
-    // Запрос через JSONP
     function fetchData(query) {
-      cleanUpScript();
-      if (!query) {
-        document.getElementById('result').innerHTML = '';
-        return;
-      }
-      // Уникальное имя колбэка
-      const callbackName = 'displayResult';
-      // Определяем глобальную функцию-колбэк
-      window[callbackName] = function(data) {
+      cleanUp();
+      document.getElementById('result').innerHTML = '';
+      if (!query) return;
+      const callback = 'displayResult';
+      window[callback] = data => {
         displayResult(data);
-        cleanUpScript();
+        cleanUp();
       };
-      // Создаём <script> для JSONP
       const script = document.createElement('script');
-      script.id = 'jsonp';
-      script.src = SCRIPT_URL
-        + '?query=' + encodeURIComponent(query)
-        + '&callback=' + callbackName;
+      script.id  = 'jsonp-script';
+      script.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=${callback}`;
       document.body.appendChild(script);
     }
 
-    // Вывод результатов
-    function displayResult(data) {
+    function displayResult(rows) {
       const container = document.getElementById('result');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<p>Ничего не найдено</p>';
+      if (!rows || rows.length === 0) {
+        container.innerHTML = '<p>No results found.</p>';
         return;
       }
-      let html = '<h3>Результат:</h3>';
-      data.forEach(row => {
-        html += `
-          <p><b>Имя:</b> ${row[1]}</p>
-          <p><b>Адрес:</b> ${row[5]}</p>
-          <p><b>Телефон:</b> ${row[7]}</p>
-          <p><b>Счет:</b> ${row[8]} (оформлен на: ${row[9]})</p>
-          <hr>
+      container.innerHTML = '';
+      rows.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <p><span class="label">Name:</span> ${r[1]}</p>
+          <p><span class="label">Address:</span> ${r[5]}</p>
+          <p><span class="label">Phone:</span> ${r[7]}</p>
+          <p><span class="label">Account #:</span> ${r[8]}</p>
+          <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
+        container.appendChild(card);
       });
-      container.innerHTML = html;
     }
 
-    // Голосовой ввод (Web Speech API)
     function startVoice() {
       if (!('webkitSpeechRecognition' in window)) {
-        alert('Голос не поддерживается. Используйте текст.');
+        alert('Voice not supported. Please type.');
         return;
       }
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'en-IE';
-      recognition.onresult = function(e) {
-        const query = e.results[0][0].transcript;
-        document.getElementById('textInput').value = query;
-        fetchData(query);
+      const rec = new webkitSpeechRecognition();
+      rec.lang = 'en-IE';
+      rec.onresult = e => {
+        const text = e.results[0][0].transcript;
+        document.getElementById('textInput').value = text;
+        fetchData(text);
       };
-      recognition.start();
+      rec.start();
     }
   </script>
 </body>
