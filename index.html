@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Арендатор Инфо</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 90%;
+      margin: 20px auto;
+      text-align: center;
+    }
+    .btn {
+      padding: 20px;
+      font-size: 24px;
+      background: #ffff99;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    input {
+      font-size: 24px;
+      width: 80%;
+      margin: 20px 0;
+      padding: 10px;
+    }
+    #result {
+      font-size: 24px;
+      margin-top: 20px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>Арендатор Инфо</h1>
+  <button class="btn" onclick="startVoice()">🎤 Скажите имя</button>
+  <input type="text" id="textInput" placeholder="Или введите имя" oninput="fetchData(this.value)">
+  <div id="result"></div>
+
+  <script>
+    // Запрос к Apps Script
+    async function fetchData(query) {
+      if (!query) return;
+      const scriptURL = "https://script.google.com/macros/s/AKfycbxVYO_UIOuUZyNhmykNP1BTyxvw0ShWqcKHfgP0wHVZXlR5_lCXJ_IDJAcD9sRHaSQiiQ/exec?query=" + encodeURIComponent(query);
+      try {
+        const response = await fetch(scriptURL);
+        const data = await response.json();
+        displayResult(data);
+      } catch (error) {
+        document.getElementById("result").innerHTML = "Ошибка: " + error.message;
+      }
+    }
+
+    // Голосовой ввод (Web Speech API)
+    function startVoice() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Голос не поддерживается. Используйте текст.");
+        return;
+      }
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-IE'; // Ирландский акцент
+      recognition.onresult = (e) => {
+        const query = e.results[0][0].transcript;
+        document.getElementById("textInput").value = query;
+        fetchData(query);
+      };
+      recognition.start();
+    }
+
+    // Вывод результата
+    function displayResult(data) {
+      if (data.length === 0) {
+        document.getElementById("result").innerHTML = "Ничего не найдено";
+        return;
+      }
+      let html = "<h3>Результат:</h3>";
+      data.forEach(row => {
+        html += `
+          <p><b>Имя:</b> ${row[1]}</p>
+          <p><b>Адрес:</b> ${row[4]}</p>
+          <p><b>Телефон:</b> ${row[6]}</p>
+          <p><b>Счет:</b> ${row[7]} (оформлен на: ${row[8]})</p>
+          <hr>
+        `;
+      });
+      document.getElementById("result").innerHTML = html;
+    }
+  </script>
+</body>
+</html>
