@@ -35,48 +35,55 @@
 <body>
   <h1>Арендатор Инфо</h1>
   <button class="btn" onclick="startVoice()">🎤 Скажите имя</button>
-  <input type="text" id="textInput" placeholder="Или введите имя" oninput="fetchData(this.value)">
+  <input
+    type="text"
+    id="textInput"
+    placeholder="Или введите имя"
+    oninput="fetchData(this.value)"
+  >
   <div id="result"></div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyP4RSfTr3zrc823XzikKRJ3Xx76ERi-Sbd9z_exO7y97YVF2-8xlTcS2oo5BcYFPFB/exec";
+    // JSONP endpoint вашего Web App
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQmJN2WeHak4cMicIoF0t_YUuSeheq-XL3QOE7HLOzIPKHog4pV_WLGBPXj5aKkNMgOg/exec';
 
-    async function fetchData(query) {
+    // Удаляем предыдущий JSONP-<script>
+    function cleanUpScript() {
+      const old = document.getElementById('jsonp');
+      if (old) old.remove();
+    }
+
+    // Запрос через JSONP
+    function fetchData(query) {
+      cleanUpScript();
       if (!query) {
-        document.getElementById("result").innerHTML = "";
+        document.getElementById('result').innerHTML = '';
         return;
       }
-      try {
-        const res = await fetch(SCRIPT_URL + "?query=" + encodeURIComponent(query));
-        if (!res.ok) throw new Error(res.status + " " + res.statusText);
-        const data = await res.json();
+      // Уникальное имя колбэка
+      const callbackName = 'displayResult';
+      // Определяем глобальную функцию-колбэк
+      window[callbackName] = function(data) {
         displayResult(data);
-      } catch (e) {
-        document.getElementById("result").innerHTML = "Ошибка: " + e.message;
-      }
-    }
-
-    function startVoice() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert("Голос не поддерживается. Используйте текст.");
-        return;
-      }
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'en-IE';
-      recognition.onresult = (e) => {
-        const query = e.results[0][0].transcript;
-        document.getElementById("textInput").value = query;
-        fetchData(query);
+        cleanUpScript();
       };
-      recognition.start();
+      // Создаём <script> для JSONP
+      const script = document.createElement('script');
+      script.id = 'jsonp';
+      script.src = SCRIPT_URL
+        + '?query=' + encodeURIComponent(query)
+        + '&callback=' + callbackName;
+      document.body.appendChild(script);
     }
 
+    // Вывод результатов
     function displayResult(data) {
+      const container = document.getElementById('result');
       if (!data || data.length === 0) {
-        document.getElementById("result").innerHTML = "Ничего не найдено";
+        container.innerHTML = '<p>Ничего не найдено</p>';
         return;
       }
-      let html = "<h3>Результат:</h3>";
+      let html = '<h3>Результат:</h3>';
       data.forEach(row => {
         html += `
           <p><b>Имя:</b> ${row[1]}</p>
@@ -86,7 +93,23 @@
           <hr>
         `;
       });
-      document.getElementById("result").innerHTML = html;
+      container.innerHTML = html;
+    }
+
+    // Голосовой ввод (Web Speech API)
+    function startVoice() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('Голос не поддерживается. Используйте текст.');
+        return;
+      }
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-IE';
+      recognition.onresult = function(e) {
+        const query = e.results[0][0].transcript;
+        document.getElementById('textInput').value = query;
+        fetchData(query);
+      };
+      recognition.start();
     }
   </script>
 </body>
