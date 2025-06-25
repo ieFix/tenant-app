@@ -5,6 +5,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Основные стили */
 :root {
   --primary: #4285F4;
   --primary-light: #e8f0fe;
@@ -428,5 +429,77 @@ body {
   100% { 
     transform: translateY(-50%) scale(1);
     box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); 
+  }
+}
+
+/* Кнопки режимов поиска */
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  margin: 15px 0 20px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.mode-btn i {
+  font-size: 18px;
+}
+
+/* Подсказка поиска */
+.search-hint {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 5px;
+  min-height: 20px;
+}
+
+/* Анимация микрофона */
+.voice-search.listening {
+  animation: pulse 1.5s infinite;
+  background-color: var(--success);
+  color: white;
+}
+
+@keyframes pulse {
+  0% { transform: translateY(-50%) scale(1); }
+  50% { transform: translateY(-50%) scale(1.1); }
+  100% { transform: translateY(-50%) scale(1); }
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+  .mode-btn {
+    padding: 10px 5px;
+    font-size: 14px;
+  }
+  
+  .mode-btn i {
+    font-size: 16px;
+  }
+  
+  .search-hint {
+    font-size: 13px;
   }
 }

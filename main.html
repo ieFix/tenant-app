@@ -24,12 +24,28 @@
         type="text" 
         class="search-input" 
         id="textInput"
-        placeholder="Search by name, Eircode, PPSN, phone..."
+        placeholder="Start typing or use voice..."
         autocomplete="off"
         enterkeyhint="search"
       >
       <button class="voice-search" id="voiceButton">
         <i class="fas fa-microphone"></i>
+      </button>
+    </div>
+    
+    <div class="search-hint" id="searchHint">
+      Search by any information: name, address, account, etc.
+    </div>
+    
+    <div class="mode-selector">
+      <button class="mode-btn active" data-mode="general">
+        <i class="fas fa-search"></i> All
+      </button>
+      <button class="mode-btn" data-mode="name">
+        <i class="fas fa-user"></i> Name
+      </button>
+      <button class="mode-btn" data-mode="address">
+        <i class="fas fa-home"></i> Address
       </button>
     </div>
     
@@ -46,20 +62,17 @@
         <i class="fas fa-search"></i>
       </div>
       <h3 class="no-results-title">No tenants found</h3>
-      <p class="no-results-text">Try searching with different terms:</p>
+      <p class="no-results-text">Try:</p>
       
       <div class="suggestions">
         <div class="suggestion">
-          <i class="fas fa-user"></i> Tenant name
+          <i class="fas fa-undo"></i> Check your spelling
         </div>
         <div class="suggestion">
-          <i class="fas fa-home"></i> Eircode or address
+          <i class="fas fa-microphone"></i> Try voice search
         </div>
         <div class="suggestion">
-          <i class="fas fa-id-card"></i> PPSN
-        </div>
-        <div class="suggestion">
-          <i class="fas fa-phone"></i> Phone number
+          <i class="fas fa-sync"></i> Switch search mode
         </div>
       </div>
     </div>

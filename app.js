@@ -1,130 +1,169 @@
-﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxz9LNz5YwHtdEn8u7_YzRlDEQP56tMyoWzlHXS9_wavJNwTbdDG7w4bkRhAnvTptslXQ/exec';
+﻿// Конфигурация
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyp9Q0oh59Gg9FemnWq1BwT3VMvtwW0WqD-Y82S4JMPdvJYUAJNC7sicYBt-tuw8yr0ag/exec';
 const CACHE_KEY = 'tenantData';
-const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 дней как резервный вариант
 let tenantData = [];
+let currentMode = 'general'; // general, name, address
+let recognition = null;
 
-// DOM Elements
+// DOM элементы
 const textInput = document.getElementById('textInput');
 const voiceButton = document.getElementById('voiceButton');
 const loader = document.getElementById('loader');
 const cardsContainer = document.getElementById('cardsContainer');
 const noResults = document.getElementById('noResults');
 const themeToggle = document.getElementById('themeToggle');
+const modeButtons = document.querySelectorAll('.mode-btn');
+const searchHint = document.getElementById('searchHint');
 
-// Global variables
-let recognition = null;
-let isListening = false;
-let permissionRequested = false;
-
-// Initialize the app
+// Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
-  // Load theme preference
+  // Загрузка темы
   if (localStorage.getItem('darkTheme') === 'true') {
     document.body.classList.add('dark-theme');
-    themeToggle.innerHTML = '<i class="fas fa-sun" style="color: #FFD700;"></i>';
+    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
   }
   
-  // Initialize voice recognition
+  // Инициализация голосового ввода
   initVoiceRecognition();
   
-  // Load cached data
-  loadCache();
+  // Загрузка данных
+  loadData();
 });
 
-// Theme Toggle
+// Переключение темы
 themeToggle.addEventListener('click', () => {
   document.body.classList.toggle('dark-theme');
   const isDarkMode = document.body.classList.contains('dark-theme');
   localStorage.setItem('darkTheme', isDarkMode);
   themeToggle.innerHTML = isDarkMode ? 
-    '<i class="fas fa-sun" style="color: #FFD700;"></i>' : 
+    '<i class="fas fa-sun"></i>' : 
     '<i class="fas fa-moon"></i>';
 });
 
-// Initialize voice recognition
+// Инициализация голосового ввода
 function initVoiceRecognition() {
-  if (isSpeechRecognitionSupported()) {
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
     recognition.lang = 'en-IE';
+    recognition.continuous = false;
     
     recognition.onstart = () => {
-      isListening = true;
       voiceButton.classList.add('listening');
+      searchHint.textContent = currentMode === 'name' ? 
+        "Speaking... (short names mode)" : 
+        "Speaking...";
     };
     
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
       textInput.value = transcript;
       filterAndRender(transcript);
-      logVoiceQuery(transcript); // Log the voice query
     };
     
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-      handleVoiceError(event.error);
-      resetVoiceButton();
+    recognition.onerror = (e) => {
+      // Особенная обработка для коротких имен
+      if (e.error === 'no-speech' && currentMode === 'name') {
+        searchHint.textContent = "Couldn't hear you. Try again, please.";
+        setTimeout(() => recognition.start(), 500);
+      } else {
+        handleVoiceError(e.error);
+        resetVoiceButton();
+      }
     };
     
-    recognition.onend = () => {
-      resetVoiceButton();
-    };
+    recognition.onend = resetVoiceButton;
   } else {
     voiceButton.style.display = 'none';
-    console.warn('Speech recognition not supported');
   }
 }
 
-// Check speech recognition support
-function isSpeechRecognitionSupported() {
-  return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+// Сброс кнопки голосового ввода
+function resetVoiceButton() {
+  voiceButton.classList.remove('listening');
+  updateSearchHint();
 }
 
-// Load cached data
-function loadCache() {
+// Обновление подсказки поиска
+function updateSearchHint() {
+  switch(currentMode) {
+    case 'general':
+      searchHint.textContent = "Search by any information: name, address, account, etc.";
+      break;
+    case 'name':
+      searchHint.textContent = "Search by name. Short names supported.";
+      break;
+    case 'address':
+      searchHint.textContent = "Search by Eircode or full address.";
+      break;
+  }
+}
+
+// Загрузка данных
+function loadData() {
+  // Проверяем кеш
   const stored = localStorage.getItem(CACHE_KEY);
   if (stored) {
-    const { ts, data } = JSON.parse(stored);
-    if (Date.now() - ts < CACHE_TIME) {
-      tenantData = data;
-      return;
-    }
+    const { data, timestamp, lastModified } = JSON.parse(stored);
+    
+    // Проверяем актуальность данных
+    getLastModified().then(serverLastModified => {
+      if (serverLastModified === lastModified) {
+        tenantData = data;
+        return;
+      }
+      
+      // Данные устарели - загружаем заново
+      fetchData(serverLastModified);
+    });
+  } else {
+    // Нет кеша - загружаем данные
+    fetchData();
   }
-  
+}
+
+// Получение даты последнего изменения с сервера
+function getLastModified() {
+  return new Promise((resolve) => {
+    window.lastModifiedCb = resp => {
+      cleanup('lastModifiedCb');
+      resolve(resp.lastModified);
+    };
+    
+    const s = document.createElement('script');
+    s.src = `${SCRIPT_URL}?action=getLastModified&callback=lastModifiedCb`;
+    document.body.appendChild(s);
+  });
+}
+
+// Загрузка данных с сервера
+function fetchData(lastModified) {
   loader.style.display = 'flex';
   
-  // Create callback for JSONP
-  window.cacheCb = resp => {
+  window.dataCb = resp => {
     tenantData = resp.data || [];
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: tenantData }));
-    cleanup('cacheCb');
+    
+    // Сохраняем в кеш с датой изменения
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: tenantData,
+      timestamp: Date.now(),
+      lastModified: lastModified
+    }));
+    
+    cleanup('dataCb');
     loader.style.display = 'none';
   };
   
-  // Load data via JSONP
   const s = document.createElement('script');
-  s.src = `${SCRIPT_URL}?callback=cacheCb`;
-  s.onerror = () => {
-    loader.style.display = 'none';
-    alert('Failed to load data. Please check your connection.');
-  };
+  s.src = `${SCRIPT_URL}?callback=dataCb`;
   document.body.appendChild(s);
 }
 
-// Cleanup JSONP script
-function cleanup(cb) {
-  const el = document.querySelector(`script[src*="${cb}"]`);
-  if (el) el.remove();
-  delete window[cb];
-}
-
-// Filter and render results
+// Фильтрация и отображение результатов
 function filterAndRender(query) {
   const lowerQuery = query.toLowerCase().trim();
   
-  // Clear results if query is empty
+  // Очистка результатов при пустом запросе
   if (!lowerQuery) {
     cardsContainer.innerHTML = '';
     noResults.style.display = 'none';
@@ -132,31 +171,59 @@ function filterAndRender(query) {
   }
   
   const rows = tenantData.filter(r => {
-    const name = (r[1] || '').toString().toLowerCase();
-    const ppsn = (r[2] || '').toString().toLowerCase();
-    const address = (r[5] || '').toString().toLowerCase();
-    const eircode = (r[6] || '').toString().toLowerCase();
-    const phone = (r[7] || '').toString().toLowerCase();
-    
-    // Check synonyms if available (column index 10)
-    let synonymsMatch = false;
-    if (r[10]) {
-      const synonyms = r[10].toString().toLowerCase().split(',');
-      synonymsMatch = synonyms.some(syn => syn.trim() === lowerQuery);
+    // Фильтрация в зависимости от режима
+    switch(currentMode) {
+      case 'general':
+        return checkGeneralMatch(r, lowerQuery);
+      case 'name':
+        return checkNameMatch(r, lowerQuery);
+      case 'address':
+        return checkAddressMatch(r, lowerQuery);
+      default:
+        return false;
     }
-    
-    return name.includes(lowerQuery) || 
-           ppsn.includes(lowerQuery) || 
-           address.includes(lowerQuery) || 
-           eircode.includes(lowerQuery) || 
-           phone.includes(lowerQuery) || 
-           synonymsMatch;
   });
   
   renderCards(rows);
 }
 
-// Render tenant cards
+// Проверка совпадения в общем режиме
+function checkGeneralMatch(row, query) {
+  return (
+    row[1]?.toLowerCase().includes(query) || // FullName
+    row[2]?.toLowerCase().includes(query) || // PPSN
+    row[3]?.toLowerCase().includes(query) || // Country
+    row[4]?.toLowerCase().includes(query) || // City
+    row[5]?.toLowerCase().includes(query) || // Address
+    row[6]?.toLowerCase().includes(query) || // Eircode
+    row[8]?.toLowerCase().includes(query) || // ElectricityAccount
+    (row[10] && checkSynonyms(row[10], query)) // Synonyms
+  );
+}
+
+// Проверка совпадения в режиме имени
+function checkNameMatch(row, query) {
+  return (
+    row[1]?.toLowerCase().includes(query) || // FullName
+    (row[10] && checkSynonyms(row[10], query)) // Synonyms
+  );
+}
+
+// Проверка совпадения в режиме адреса
+function checkAddressMatch(row, query) {
+  return (
+    row[5]?.toLowerCase().includes(query) || // Address
+    row[6]?.toLowerCase().includes(query)  // Eircode
+  );
+}
+
+// Проверка синонимов
+function checkSynonyms(synonyms, query) {
+  const synonymList = synonyms.toLowerCase().split(',');
+  return synonymList.some(syn => syn.trim() === query);
+}
+
+// Отображение карточек
 function renderCards(rows) {
   cardsContainer.innerHTML = '';
   
@@ -171,7 +238,7 @@ function renderCards(rows) {
     const card = document.createElement('div');
     card.className = 'tenant-card';
     
-    // Get initials for avatar
+    // Получаем инициалы для аватара
     const names = r[1] ? r[1].split(' ') : ['?'];
     const firstName = names[0] || '';
     const lastName = names.length > 1 ? names[names.length - 1] : firstName;
@@ -219,81 +286,7 @@ function renderCards(rows) {
   });
 }
 
-// Log voice query to Google Sheet
-function logVoiceQuery(query) {
-  if (!query) return;
-  
-  // Create callback for JSONP
-  window.logCallback = function() {
-    cleanup('logCallback');
-  };
-  
-  // Log via JSONP
-  const s = document.createElement('script');
-  s.src = `${SCRIPT_URL}?action=log&query=${encodeURIComponent(query)}&callback=logCallback`;
-  document.body.appendChild(s);
-}
-
-// Voice search
-function startVoice() {
-  if (!recognition) {
-    alert('Voice recognition is not supported in your browser. Please use Chrome or Safari on iOS 14.5+.');
-    return;
-  }
-  
-  // Request permission on iOS
-  if (isIOS() && !permissionRequested) {
-    requestIOSPermission();
-    return;
-  }
-  
-  startRecognition();
-}
-
-// Request permission for iOS
-function requestIOSPermission() {
-  alert('To use voice search, please allow microphone access in the next prompt.');
-  
-  if (typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission()
-      .then(permissionState => {
-        permissionRequested = true;
-        if (permissionState === 'granted') {
-          startRecognition();
-        } else {
-          alert('Permission to use microphone was denied. Please enable in browser settings.');
-        }
-      })
-      .catch(console.error);
-  } else {
-    startRecognition();
-  }
-}
-
-// Check if iOS
-function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
-
-// Start recognition
-function startRecognition() {
-  if (isListening) return;
-  
-  try {
-    recognition.start();
-  } catch (error) {
-    console.error('Error starting recognition:', error);
-    handleVoiceError(error);
-  }
-}
-
-// Reset voice button state
-function resetVoiceButton() {
-  isListening = false;
-  voiceButton.classList.remove('listening');
-}
-
-// Handle voice errors
+// Обработка ошибок голосового ввода
 function handleVoiceError(error) {
   let message = 'Voice recognition failed. Please try again.';
   
@@ -307,27 +300,51 @@ function handleVoiceError(error) {
     case 'not-allowed':
       message = 'Microphone permission denied. Please enable in browser settings.';
       break;
-    case 'network':
-      message = 'Network error occurred. Please check your connection.';
-      break;
-    case 'service-not-allowed':
-      message = 'Voice recognition service not available.';
-      break;
   }
   
-  alert(message);
+  searchHint.textContent = message;
+  setTimeout(() => updateSearchHint(), 3000);
 }
 
-// Event Listeners
+// Переключение режимов поиска
+function setSearchMode(mode) {
+  currentMode = mode;
+  
+  // Обновляем активную кнопку
+  modeButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  
+  // Обновляем подсказку
+  updateSearchHint();
+  
+  // Применяем текущий фильтр
+  if (textInput.value) {
+    filterAndRender(textInput.value);
+  }
+}
+
+// Очистка скриптов JSONP
+function cleanup(cb) {
+  const el = document.querySelector(`script[src*="${cb}"]`);
+  if (el) el.remove();
+  delete window[cb];
+}
+
+// Обработчики событий
 textInput.addEventListener('input', () => {
   filterAndRender(textInput.value);
 });
 
-voiceButton.addEventListener('click', startVoice);
-
-// Add keyboard shortcut for voice search (v key)
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'v' && document.activeElement !== textInput) {
-    startVoice();
-  }
+voiceButton.addEventListener('click', () => {
+  if (recognition) recognition.start();
 });
+
+modeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    setSearchMode(btn.dataset.mode);
+  });
+});
+
+// Установка общего режима по умолчанию
+setSearchMode('general');
