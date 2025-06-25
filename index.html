@@ -37,11 +37,12 @@
       background: #007aff;
       color: #fff;
       border: none;
-      max-width: 100px;
+      max-width: 80px;
     }
     #loader {
       display: none;
       margin: 1rem;
+      font-size: 1rem;
     }
     #result {
       width: 100%;
@@ -80,19 +81,25 @@
   <h1>Tenant Info</h1>
   <div class="controls">
     <button onclick="startVoice()">🎤</button>
-    <input id="textInput" type="text" placeholder="Name or Eircode" oninput="onInput()" />
+    <input
+      id="textInput"
+      type="text"
+      placeholder="Search by Name, Eircode, PPSN…"
+      oninput="onInput()"
+    />
   </div>
-  <div id="loader">🔄 Loading...</div>
+  <div id="loader">🔄 Loading data…</div>
   <div id="result"></div>
 
   <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyg0-i__opF28Umw7e3C5CgXYDVJ3L5nvat_5eZSLfx7IYFHbVBRkzw24RwIwojZpza_g/exec';
     const CACHE_KEY = 'tenantData';
     const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
-
     let cache = null;
 
-    // Load or refresh cache
+    // Preload cache on page load
+    document.addEventListener('DOMContentLoaded', loadCache);
+
     async function loadCache() {
       const stored = localStorage.getItem(CACHE_KEY);
       if (stored) {
@@ -102,16 +109,17 @@
           return;
         }
       }
-      // fetch full data via JSONP
-      return new Promise(resolve => {
-        window['cacheCallback'] = resp => {
+      document.getElementById('loader').style.display = 'block';
+      await new Promise(resolve => {
+        window['cacheCb'] = resp => {
           cache = resp.data;
           localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cache }));
-          cleanup('cacheCallback');
+          cleanup('cacheCb');
+          document.getElementById('loader').style.display = 'none';
           resolve();
         };
         const s = document.createElement('script');
-        s.src = `${SCRIPT_URL}?callback=cacheCallback`;
+        s.src = `${SCRIPT_URL}?callback=cacheCb`;
         document.body.appendChild(s);
       });
     }
@@ -124,21 +132,22 @@
 
     function onInput() {
       const q = document.getElementById('textInput').value.trim().toLowerCase();
-      if (!cache) {
-        document.getElementById('loader').style.display = 'block';
-        loadCache().then(() => { document.getElementById('loader').style.display = 'none'; filterAndRender(q); });
-      } else {
-        filterAndRender(q);
-      }
+      if (!cache) return;
+      document.getElementById('loader').style.display = 'none';
+      filterAndRender(q);
     }
 
     function filterAndRender(query) {
-      document.getElementById('loader').style.display = 'none';
       const rows = query
         ? cache.filter(r =>
-            r[1].toString().toLowerCase().includes(query) ||
-            r[5].toString().toLowerCase().includes(query) ||
-            r[6].toString().toLowerCase().includes(query)
+            r[1].toString().toLowerCase().includes(query) || // FullName
+            r[2].toString().toLowerCase().includes(query) || // PPSN
+            r[3].toString().toLowerCase().includes(query) || // Country
+            r[4].toString().toLowerCase().includes(query) || // City
+            r[5].toString().toLowerCase().includes(query) || // Address
+            r[6].toString().toLowerCase().includes(query) || // Eircode
+            r[7].toString().toLowerCase().includes(query) || // Phone
+            r[8].toString().toLowerCase().includes(query)    // ElectricityAccount
           )
         : [];
       renderCards(rows);
@@ -148,7 +157,16 @@
       const c = document.getElementById('result');
       c.innerHTML = '';
       if (!rows.length) {
-        c.innerHTML = '<p style="text-align:center;">No results found.</p>';
+        c.innerHTML = `
+          <div class="card">
+            <p>No results found.</p>
+            <p>Please try:</p>
+            <ul>
+              <li>Another spelling</li>
+              <li>A different field (Eircode, PPSN, City)</li>
+              <li>Check your input</li>
+            </ul>
+          </div>`;
         return;
       }
       rows.forEach(r => {
@@ -158,8 +176,9 @@
           <p><span class="label">Name:</span> ${r[1]}</p>
           <p><span class="label">Address:</span> ${r[5]}</p>
           <p><span class="label">Eircode:</span> ${r[6]}</p>
+          <p><span class="label">PPSN:</span> ${r[2]}</p>
           <p><span class="label">Phone:</span> ${r[7]}</p>
-          <p><span class="label">Account #:</span> ${r[8]}</p>
+          <p><span class="label">Electricity Acc.:</span> ${r[8]}</p>
           <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
         c.appendChild(card);
@@ -176,9 +195,6 @@
       };
       rec.start();
     }
-
-    // Preload cache on page load
-    document.addEventListener('DOMContentLoaded', loadCache);
   </script>
 </body>
 </html>
