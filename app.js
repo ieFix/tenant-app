@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEuKhdIZRVzsQZSIP_WCyEfF1rI9mLnb47efx3EUKNDRGk05EOhi-hCTwGv5KEpzAD5w/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5BE0oEXvvuPLXWcoKKnj6sxMU1aLdWqAyDZMlfg6WWkAX6Q4Q8aQUVKr7qj2--zkobg/exec';
 const CACHE_KEY = 'tenantData';
 const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
 let tenantData = [];
@@ -38,14 +38,15 @@ themeToggle.addEventListener('click', () => {
   const isDarkMode = document.body.classList.contains('dark-theme');
   localStorage.setItem('darkTheme', isDarkMode);
   themeToggle.innerHTML = isDarkMode ? 
-    '<i class="fas fa-sun"></i>' : 
+    '<i class="fas fa-sun" style="color: #FFD700;"></i>' : 
     '<i class="fas fa-moon"></i>';
 });
 
 // Initialize voice recognition
 function initVoiceRecognition() {
-  if ('webkitSpeechRecognition' in window) {
-    recognition = new webkitSpeechRecognition();
+  // Проверка поддержки для Android и iOS
+  if (isSpeechRecognitionSupported()) {
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-IE';
@@ -72,7 +73,13 @@ function initVoiceRecognition() {
     };
   } else {
     voiceButton.style.display = 'none';
+    console.warn('Speech recognition not supported');
   }
+}
+
+// Проверка поддержки распознавания речи
+function isSpeechRecognitionSupported() {
+  return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
 }
 
 // Load cached data
@@ -90,11 +97,10 @@ function loadCache() {
   
   // Create callback for JSONP
   window.cacheCb = resp => {
-    tenantData = resp.data;
+    tenantData = resp.data || [];
     localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: tenantData }));
     cleanup('cacheCb');
     loader.style.display = 'none';
-    // Don't render anything on initial load
   };
   
   // Load data via JSONP
@@ -206,8 +212,21 @@ function startVoice() {
     return;
   }
   
-  // Request permission on iOS
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !permissionRequested) {
+  // Запрос разрешения для iOS
+  if (isIOS() && !permissionRequested) {
+    requestIOSPermission();
+    return;
+  }
+  
+  startRecognition();
+}
+
+// Запрос разрешения для iOS
+function requestIOSPermission() {
+  // Для iOS требуется действие пользователя для запроса разрешения
+  alert('To use voice search, please allow microphone access in the next prompt.');
+  
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission()
       .then(permissionState => {
         permissionRequested = true;
@@ -219,8 +238,14 @@ function startVoice() {
       })
       .catch(console.error);
   } else {
+    // Для старых версий iOS
     startRecognition();
   }
+}
+
+// Проверка iOS
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
 // Start recognition
@@ -258,6 +283,9 @@ function handleVoiceError(error) {
     case 'network':
       message = 'Network error occurred. Please check your connection.';
       break;
+    case 'service-not-allowed':
+      message = 'Voice recognition service not available.';
+      break;
   }
   
   alert(message);
@@ -275,10 +303,4 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'v' && document.activeElement !== textInput) {
     startVoice();
   }
-});
-
-// Clear input when user starts typing
-textInput.addEventListener('focus', () => {
-  textInput.value = '';
-  filterAndRender('');
 });
