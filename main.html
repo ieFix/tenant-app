@@ -24,13 +24,14 @@
         type="text" 
         class="search-input" 
         id="textInput"
-        placeholder="Start typing or use voice..."
+        placeholder="Search by name, address, account..."
         autocomplete="off"
         enterkeyhint="search"
       >
       <button class="voice-search" id="voiceButton">
         <i class="fas fa-microphone"></i>
       </button>
+      <div id="suggestionsContainer" class="suggestions-container"></div>
     </div>
     
     <div class="search-hint" id="searchHint">
@@ -54,25 +55,25 @@
     </div>
     
     <div class="cards-container" id="cardsContainer">
-      <!-- Tenant cards will be inserted here -->
+      <!-- Cards will be added here -->
     </div>
     
-    <div class="no-results" id="noResults" style="display: none;">
+    <div class="no-results" id="noResults">
       <div class="no-results-icon">
         <i class="fas fa-search"></i>
       </div>
-      <h3 class="no-results-title">No tenants found</h3>
+      <h3 class="no-results-title">No results found</h3>
       <p class="no-results-text">Try:</p>
       
       <div class="suggestions">
         <div class="suggestion">
-          <i class="fas fa-undo"></i> Check your spelling
+          <i class="fas fa-undo"></i> Check spelling
         </div>
         <div class="suggestion">
-          <i class="fas fa-microphone"></i> Try voice search
+          <i class="fas fa-keyboard"></i> Type manually
         </div>
         <div class="suggestion">
-          <i class="fas fa-sync"></i> Switch search mode
+          <i class="fas fa-sync"></i> Change search mode
         </div>
       </div>
     </div>

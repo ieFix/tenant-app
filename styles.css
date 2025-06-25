@@ -5,7 +5,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Основные стили */
 :root {
   --primary: #4285F4;
   --primary-light: #e8f0fe;
@@ -131,6 +130,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  z-index: 10;
 }
 
 .voice-search:hover {
@@ -143,14 +143,50 @@ body {
 
 .voice-search.listening {
   animation: pulse 1.5s infinite;
-  background-color: var(--error);
+  background-color: var(--success);
   color: white;
 }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(234,67,53,0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(234,67,53,0); }
-  100% { box-shadow: 0 0 0 0 rgba(234,67,53,0); }
+  0% { 
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7); 
+  }
+  70% { 
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); 
+  }
+  100% { 
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); 
+  }
+}
+
+/* Suggestions Container */
+.suggestions-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card-bg);
+  border-radius: 0 0 16px 16px;
+  border: 1px solid var(--border);
+  border-top: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+
+.suggestion-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.suggestion-item:hover {
+  background-color: var(--primary-light);
 }
 
 /* Loader */
@@ -267,6 +303,7 @@ body {
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
   margin-top: 20px;
+  display: none;
 }
 
 .no-results-icon {
@@ -314,125 +351,7 @@ body {
   border-color: var(--primary);
 }
 
-/* Mobile Optimizations */
-@media (max-width: 480px) {
-  .header {
-    padding: 10px 0 15px;
-  }
-  
-  .app-title {
-    font-size: 20px;
-  }
-  
-  .card-body {
-    grid-template-columns: 1fr;
-  }
-  
-  .tenant-name {
-    font-size: 17px;
-  }
-}
-
-/* iPhone notch/padding adjustments */
-@supports (padding: max(0px)) {
-  body {
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-}
-
-/* Styles for empty field */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-secondary);
-}
-
-.empty-state i {
-  font-size: 48px;
-  margin-bottom: 15px;
-}
-
-.empty-state p {
-  font-size: 18px;
-}
-
-/* Voice button */
-.voice-search {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 18px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 10; /* Ensure it's above other elements */
-}
-
-.voice-search.listening {
-  animation: pulse 1.5s infinite;
-  background-color: var(--success);
-  color: white;
-}
-
-/* Theme toggle colors */
-.theme-toggle i {
-  color: var(--text); /* Default color */
-}
-
-.dark-theme .theme-toggle i {
-  color: #FFD700; /* Yellow color for sun in dark mode */
-}
-
-/* iOS specific adjustments */
-@supports (-webkit-touch-callout: none) {
-  .search-input {
-    padding-right: 50px; /* Extra space for iOS clear button */
-  }
-  
-  .voice-search {
-    right: 20px; /* Adjust position for iOS */
-  }
-}
-
-/* Android specific adjustments */
-@supports (-webkit-overflow-scrolling: touch) and (not (-webkit-touch-callout: none)) {
-  .search-input {
-    padding-right: 46px; /* Adjust for Android */
-  }
-  
-  .voice-search {
-    right: 18px; /* Adjust position for Android */
-  }
-}
-
-/* Microphone animation */
-@keyframes pulse {
-  0% { 
-    transform: translateY(-50%) scale(1);
-    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7); 
-  }
-  70% { 
-    transform: translateY(-50%) scale(1.05);
-    box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); 
-  }
-  100% { 
-    transform: translateY(-50%) scale(1);
-    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); 
-  }
-}
-
-/* Кнопки режимов поиска */
+/* Mode Selector */
 .mode-selector {
   display: flex;
   gap: 8px;
@@ -461,11 +380,7 @@ body {
   border-color: var(--primary);
 }
 
-.mode-btn i {
-  font-size: 18px;
-}
-
-/* Подсказка поиска */
+/* Search Hint */
 .search-hint {
   color: var(--text-secondary);
   font-size: 14px;
@@ -475,21 +390,33 @@ body {
   min-height: 20px;
 }
 
-/* Анимация микрофона */
-.voice-search.listening {
-  animation: pulse 1.5s infinite;
-  background-color: var(--success);
-  color: white;
+/* Theme toggle */
+.theme-toggle i {
+  color: var(--text);
 }
 
-@keyframes pulse {
-  0% { transform: translateY(-50%) scale(1); }
-  50% { transform: translateY(-50%) scale(1.1); }
-  100% { transform: translateY(-50%) scale(1); }
+.dark-theme .theme-toggle i {
+  color: #FFD700;
 }
 
-/* Адаптивность */
+/* Mobile Optimizations */
 @media (max-width: 480px) {
+  .header {
+    padding: 10px 0 15px;
+  }
+  
+  .app-title {
+    font-size: 20px;
+  }
+  
+  .card-body {
+    grid-template-columns: 1fr;
+  }
+  
+  .tenant-name {
+    font-size: 17px;
+  }
+  
   .mode-btn {
     padding: 10px 5px;
     font-size: 14px;
@@ -501,5 +428,14 @@ body {
   
   .search-hint {
     font-size: 13px;
+  }
+}
+
+/* Safe area for modern devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }

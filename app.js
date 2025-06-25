@@ -1,12 +1,12 @@
-﻿// Конфигурация
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyp9Q0oh59Gg9FemnWq1BwT3VMvtwW0WqD-Y82S4JMPdvJYUAJNC7sicYBt-tuw8yr0ag/exec';
+﻿// Configuration
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx06_E1Qw3oQaBWOKILl7PDVpqcvjypdu6d7ZNBGpNQKM7cSq0JzRMGViieB1v-7Mdz5Q/exec';
 const CACHE_KEY = 'tenantData';
-const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 дней как резервный вариант
+const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 days
 let tenantData = [];
-let currentMode = 'general'; // general, name, address
+let currentMode = 'general';
 let recognition = null;
 
-// DOM элементы
+// DOM elements
 const textInput = document.getElementById('textInput');
 const voiceButton = document.getElementById('voiceButton');
 const loader = document.getElementById('loader');
@@ -15,114 +15,157 @@ const noResults = document.getElementById('noResults');
 const themeToggle = document.getElementById('themeToggle');
 const modeButtons = document.querySelectorAll('.mode-btn');
 const searchHint = document.getElementById('searchHint');
+const suggestionsContainer = document.getElementById('suggestionsContainer');
 
-// Инициализация приложения
+// Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
-  // Загрузка темы
+  // Load theme
   if (localStorage.getItem('darkTheme') === 'true') {
     document.body.classList.add('dark-theme');
     themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
   }
   
-  // Инициализация голосового ввода
+  // Initialize voice recognition
   initVoiceRecognition();
   
-  // Загрузка данных
+  // Load data
   loadData();
+  
+  // Set up event listeners
+  setupEventListeners();
 });
 
-// Переключение темы
-themeToggle.addEventListener('click', () => {
-  document.body.classList.toggle('dark-theme');
-  const isDarkMode = document.body.classList.contains('dark-theme');
-  localStorage.setItem('darkTheme', isDarkMode);
-  themeToggle.innerHTML = isDarkMode ? 
-    '<i class="fas fa-sun"></i>' : 
-    '<i class="fas fa-moon"></i>';
-});
+// Set up event listeners
+function setupEventListeners() {
+  // Theme toggle
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark-theme');
+    const isDarkMode = document.body.classList.contains('dark-theme');
+    localStorage.setItem('darkTheme', isDarkMode);
+    themeToggle.innerHTML = isDarkMode ? 
+      '<i class="fas fa-sun"></i>' : 
+      '<i class="fas fa-moon"></i>';
+  });
+  
+  // Text input search
+  textInput.addEventListener('input', () => {
+    filterAndRender(textInput.value);
+    showSuggestions(textInput.value);
+  });
+  
+  // Voice input
+  voiceButton.addEventListener('click', startVoiceRecognition);
+  
+  // Mode switching
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setSearchMode(btn.dataset.mode);
+      if (textInput.value) filterAndRender(textInput.value);
+      hideSuggestions();
+    });
+  });
+  
+  // Click outside to hide suggestions
+  document.addEventListener('click', (e) => {
+    if (!suggestionsContainer.contains(e.target)) {
+      hideSuggestions();
+    }
+  });
+  
+  // Set default mode
+  setSearchMode('general');
+}
 
-// Инициализация голосового ввода
+// Initialize voice recognition
 function initVoiceRecognition() {
   if ('webkitSpeechRecognition' in window) {
     recognition = new webkitSpeechRecognition();
-    recognition.lang = 'en-IE';
+    recognition.lang = 'en-US';
     recognition.continuous = false;
+    recognition.maxAlternatives = 1;
     
     recognition.onstart = () => {
       voiceButton.classList.add('listening');
-      searchHint.textContent = currentMode === 'name' ? 
-        "Speaking... (short names mode)" : 
-        "Speaking...";
+      searchHint.textContent = "Listening... Speak now";
     };
     
     recognition.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
       textInput.value = transcript;
       filterAndRender(transcript);
+      logVoiceQuery(transcript);
     };
     
     recognition.onerror = (e) => {
-      // Особенная обработка для коротких имен
-      if (e.error === 'no-speech' && currentMode === 'name') {
-        searchHint.textContent = "Couldn't hear you. Try again, please.";
-        setTimeout(() => recognition.start(), 500);
-      } else {
-        handleVoiceError(e.error);
-        resetVoiceButton();
+      let message = "Sorry, I didn't catch that. Please try typing.";
+      
+      switch(e.error) {
+        case 'no-speech':
+          message = "No speech detected. Please type instead.";
+          break;
+        case 'audio-capture':
+          message = "Microphone not available. Please type.";
+          break;
+        case 'not-allowed':
+          message = "Microphone access denied. Please allow access in settings.";
+          break;
       }
+      
+      searchHint.textContent = message;
+      resetVoiceButton();
+      setTimeout(() => updateSearchHint(), 3000);
     };
     
     recognition.onend = resetVoiceButton;
   } else {
     voiceButton.style.display = 'none';
+    searchHint.textContent = "Voice input not supported in this browser";
   }
 }
 
-// Сброс кнопки голосового ввода
+// Reset voice button
 function resetVoiceButton() {
   voiceButton.classList.remove('listening');
   updateSearchHint();
 }
 
-// Обновление подсказки поиска
+// Update search hint based on mode
 function updateSearchHint() {
   switch(currentMode) {
     case 'general':
       searchHint.textContent = "Search by any information: name, address, account, etc.";
       break;
     case 'name':
-      searchHint.textContent = "Search by name. Short names supported.";
+      searchHint.textContent = "Search by name. Supports short names.";
       break;
     case 'address':
-      searchHint.textContent = "Search by Eircode or full address.";
+      searchHint.textContent = "Search by Eircode or address.";
       break;
   }
 }
 
-// Загрузка данных
+// Load data
 function loadData() {
-  // Проверяем кеш
   const stored = localStorage.getItem(CACHE_KEY);
-  if (stored) {
-    const { data, timestamp, lastModified } = JSON.parse(stored);
-    
-    // Проверяем актуальность данных
-    getLastModified().then(serverLastModified => {
-      if (serverLastModified === lastModified) {
+  
+  // Check data freshness
+  getLastModified().then(serverLastModified => {
+    if (stored) {
+      const { data, timestamp, lastModified } = JSON.parse(stored);
+      
+      // Use cache if data is fresh
+      if (lastModified === serverLastModified && Date.now() - timestamp < CACHE_TIME) {
         tenantData = data;
         return;
       }
-      
-      // Данные устарели - загружаем заново
-      fetchData(serverLastModified);
-    });
-  } else {
-    // Нет кеша - загружаем данные
-    fetchData();
-  }
+    }
+    
+    // Fetch new data
+    fetchData(serverLastModified);
+  });
 }
 
-// Получение даты последнего изменения с сервера
+// Get last modified date from server
 function getLastModified() {
   return new Promise((resolve) => {
     window.lastModifiedCb = resp => {
@@ -131,19 +174,19 @@ function getLastModified() {
     };
     
     const s = document.createElement('script');
-    s.src = `${SCRIPT_URL}?action=getLastModified&callback=lastModifiedCb`;
+    s.src = `${SCRIPT_URL}?action=lastmodified&callback=lastModifiedCb`;
     document.body.appendChild(s);
   });
 }
 
-// Загрузка данных с сервера
+// Fetch data from server
 function fetchData(lastModified) {
   loader.style.display = 'flex';
   
   window.dataCb = resp => {
     tenantData = resp.data || [];
     
-    // Сохраняем в кеш с датой изменения
+    // Save to cache with last modified date
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
       timestamp: Date.now(),
@@ -152,6 +195,9 @@ function fetchData(lastModified) {
     
     cleanup('dataCb');
     loader.style.display = 'none';
+    
+    // Apply current search if any
+    if (textInput.value) filterAndRender(textInput.value);
   };
   
   const s = document.createElement('script');
@@ -159,26 +205,27 @@ function fetchData(lastModified) {
   document.body.appendChild(s);
 }
 
-// Фильтрация и отображение результатов
+// Filter and render results
 function filterAndRender(query) {
   const lowerQuery = query.toLowerCase().trim();
   
-  // Очистка результатов при пустом запросе
+  // Clear results on empty query
   if (!lowerQuery) {
     cardsContainer.innerHTML = '';
     noResults.style.display = 'none';
+    hideSuggestions();
     return;
   }
   
-  const rows = tenantData.filter(r => {
-    // Фильтрация в зависимости от режима
+  const rows = tenantData.filter(row => {
+    // Filter based on current mode
     switch(currentMode) {
       case 'general':
-        return checkGeneralMatch(r, lowerQuery);
+        return checkGeneralMatch(row, lowerQuery);
       case 'name':
-        return checkNameMatch(r, lowerQuery);
+        return checkNameMatch(row, lowerQuery);
       case 'address':
-        return checkAddressMatch(r, lowerQuery);
+        return checkAddressMatch(row, lowerQuery);
       default:
         return false;
     }
@@ -187,43 +234,45 @@ function filterAndRender(query) {
   renderCards(rows);
 }
 
-// Проверка совпадения в общем режиме
+// Check match in general mode
 function checkGeneralMatch(row, query) {
   return (
-    row[1]?.toLowerCase().includes(query) || // FullName
-    row[2]?.toLowerCase().includes(query) || // PPSN
-    row[3]?.toLowerCase().includes(query) || // Country
-    row[4]?.toLowerCase().includes(query) || // City
-    row[5]?.toLowerCase().includes(query) || // Address
-    row[6]?.toLowerCase().includes(query) || // Eircode
-    row[8]?.toLowerCase().includes(query) || // ElectricityAccount
+    (row[1] && row[1].toString().toLowerCase().includes(query)) || // FullName
+    (row[2] && row[2].toString().toLowerCase().includes(query)) || // PPSN
+    (row[3] && row[3].toString().toLowerCase().includes(query)) || // Country
+    (row[4] && row[4].toString().toLowerCase().includes(query)) || // City
+    (row[5] && row[5].toString().toLowerCase().includes(query)) || // Address
+    (row[6] && row[6].toString().toLowerCase().includes(query)) || // Eircode
+    (row[7] && row[7].toString().toLowerCase().includes(query)) || // Phone
+    (row[8] && row[8].toString().toLowerCase().includes(query)) || // ElectricityAccount
     (row[10] && checkSynonyms(row[10], query)) // Synonyms
   );
 }
 
-// Проверка совпадения в режиме имени
+// Check match in name mode
 function checkNameMatch(row, query) {
   return (
-    row[1]?.toLowerCase().includes(query) || // FullName
+    (row[1] && row[1].toString().toLowerCase().includes(query)) || // FullName
     (row[10] && checkSynonyms(row[10], query)) // Synonyms
   );
 }
 
-// Проверка совпадения в режиме адреса
+// Check match in address mode
 function checkAddressMatch(row, query) {
   return (
-    row[5]?.toLowerCase().includes(query) || // Address
-    row[6]?.toLowerCase().includes(query)  // Eircode
+    (row[5] && row[5].toString().toLowerCase().includes(query)) || // Address
+    (row[6] && row[6].toString().toLowerCase().includes(query)) // Eircode
   );
 }
 
-// Проверка синонимов
+// Check synonyms
 function checkSynonyms(synonyms, query) {
-  const synonymList = synonyms.toLowerCase().split(',');
+  if (!synonyms) return false;
+  const synonymList = synonyms.toString().toLowerCase().split(',');
   return synonymList.some(syn => syn.trim() === query);
 }
 
-// Отображение карточек
+// Render cards
 function renderCards(rows) {
   cardsContainer.innerHTML = '';
   
@@ -234,12 +283,12 @@ function renderCards(rows) {
   
   noResults.style.display = 'none';
   
-  rows.forEach(r => {
+  rows.forEach(row => {
     const card = document.createElement('div');
     card.className = 'tenant-card';
     
-    // Получаем инициалы для аватара
-    const names = r[1] ? r[1].split(' ') : ['?'];
+    // Get initials for avatar
+    const names = row[1] ? row[1].split(' ') : ['?'];
     const firstName = names[0] || '';
     const lastName = names.length > 1 ? names[names.length - 1] : firstName;
     const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
@@ -248,36 +297,36 @@ function renderCards(rows) {
       <div class="card-header">
         <div class="avatar">${initials}</div>
         <div class="tenant-info">
-          <div class="tenant-name">${r[1] || 'Unknown'}</div>
+          <div class="tenant-name">${row[1] || 'Unknown'}</div>
           <div class="tenant-location">
-            <i class="fas fa-map-marker-alt"></i> ${r[4] || 'Unknown'}, ${r[3] || 'Unknown'}
+            <i class="fas fa-map-marker-alt"></i> ${row[4] || 'Unknown'}, ${row[3] || 'Unknown'}
           </div>
         </div>
       </div>
       <div class="card-body">
         <div class="info-group">
           <div class="info-label">Address</div>
-          <div class="info-value">${r[5] || 'Unknown'}</div>
+          <div class="info-value">${row[5] || 'Unknown'}</div>
         </div>
         <div class="info-group">
           <div class="info-label">Eircode</div>
-          <div class="info-value">${r[6] || 'Unknown'}</div>
+          <div class="info-value">${row[6] || 'Unknown'}</div>
         </div>
         <div class="info-group">
           <div class="info-label">Phone</div>
-          <div class="info-value">${r[7] || 'Unknown'}</div>
+          <div class="info-value">${row[7] || 'Unknown'}</div>
         </div>
         <div class="info-group">
           <div class="info-label">PPSN</div>
-          <div class="info-value">${r[2] || 'Unknown'}</div>
+          <div class="info-value">${row[2] || 'Unknown'}</div>
         </div>
         <div class="info-group">
           <div class="info-label">Electricity Account</div>
-          <div class="info-value">${r[8] || 'Unknown'}</div>
+          <div class="info-value">${row[8] || 'Unknown'}</div>
         </div>
         <div class="info-group">
           <div class="info-label">Account Holder</div>
-          <div class="info-value">${r[9] || 'Unknown'}</div>
+          <div class="info-value">${row[9] || 'Unknown'}</div>
         </div>
       </div>
     `;
@@ -286,65 +335,129 @@ function renderCards(rows) {
   });
 }
 
-// Обработка ошибок голосового ввода
-function handleVoiceError(error) {
-  let message = 'Voice recognition failed. Please try again.';
+// Show suggestions
+function showSuggestions(query) {
+  suggestionsContainer.innerHTML = '';
   
-  switch(error) {
-    case 'no-speech':
-      message = 'No speech detected. Please speak clearly.';
+  if (query.length < 2) {
+    hideSuggestions();
+    return;
+  }
+  
+  let suggestions = [];
+  
+  // Depending on mode, suggest different things
+  switch(currentMode) {
+    case 'general':
+      // For general, we suggest names and addresses
+      suggestions = [
+        ...tenantData.map(row => row[1]), // names
+        ...tenantData.map(row => row[5]), // addresses
+        ...tenantData.map(row => row[6])  // eircodes
+      ].filter(Boolean);
       break;
-    case 'audio-capture':
-      message = 'Microphone not available. Please check your device settings.';
+    case 'name':
+      suggestions = tenantData.map(row => row[1]).filter(Boolean); // names
       break;
-    case 'not-allowed':
-      message = 'Microphone permission denied. Please enable in browser settings.';
+    case 'address':
+      suggestions = [
+        ...tenantData.map(row => row[5]), // addresses
+        ...tenantData.map(row => row[6])  // eircodes
+      ].filter(Boolean);
       break;
   }
   
-  searchHint.textContent = message;
-  setTimeout(() => updateSearchHint(), 3000);
+  // Remove duplicates and filter by query
+  const uniqueSuggestions = [...new Set(suggestions)];
+  const matches = uniqueSuggestions.filter(s => 
+    s.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 5);
+  
+  if (matches.length > 0) {
+    matches.forEach(text => {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      div.textContent = text;
+      div.addEventListener('click', () => {
+        textInput.value = text;
+        filterAndRender(text);
+        hideSuggestions();
+      });
+      suggestionsContainer.appendChild(div);
+    });
+    suggestionsContainer.style.display = 'block';
+  } else {
+    hideSuggestions();
+  }
 }
 
-// Переключение режимов поиска
+// Hide suggestions
+function hideSuggestions() {
+  suggestionsContainer.style.display = 'none';
+}
+
+// Log voice query
+function logVoiceQuery(query) {
+  if (!query) return;
+  
+  window.logCb = function() {
+    cleanup('logCb');
+  };
+  
+  const s = document.createElement('script');
+  s.src = `${SCRIPT_URL}?action=log&query=${encodeURIComponent(query)}&callback=logCb`;
+  document.body.appendChild(s);
+}
+
+// Start voice recognition
+function startVoiceRecognition() {
+  if (!recognition) return;
+  
+  // For iOS, request permission
+  if (isIOS() && !window.voicePermissionRequested) {
+    requestIOSPermission();
+    return;
+  }
+  
+  recognition.start();
+}
+
+// Request iOS permission
+function requestIOSPermission() {
+  alert('For voice input, microphone access is required.');
+  
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then(permissionState => {
+        window.voicePermissionRequested = true;
+        if (permissionState === 'granted') {
+          recognition.start();
+        }
+      });
+  }
+}
+
+// Check if iOS
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// Set search mode
 function setSearchMode(mode) {
   currentMode = mode;
   
-  // Обновляем активную кнопку
+  // Update active button
   modeButtons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
   
-  // Обновляем подсказку
+  // Update hint
   updateSearchHint();
-  
-  // Применяем текущий фильтр
-  if (textInput.value) {
-    filterAndRender(textInput.value);
-  }
 }
 
-// Очистка скриптов JSONP
+// Cleanup JSONP scripts
 function cleanup(cb) {
   const el = document.querySelector(`script[src*="${cb}"]`);
   if (el) el.remove();
   delete window[cb];
 }
-
-// Обработчики событий
-textInput.addEventListener('input', () => {
-  filterAndRender(textInput.value);
-});
-
-voiceButton.addEventListener('click', () => {
-  if (recognition) recognition.start();
-});
-
-modeButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    setSearchMode(btn.dataset.mode);
-  });
-});
-
-// Установка общего режима по умолчанию
-setSearchMode('general');
