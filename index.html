@@ -3,65 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tenant Info</title>
+  <title>Tenant Info (Debug)</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f5f5f5;
-      color: #222;
-      text-align: center;
-      padding: 30px;
-    }
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-    input, button {
-      font-size: 1.5rem;
-      padding: 0.8rem;
-      margin: 0.5rem 0;
-      width: 90%;
-      max-width: 400px;
-      border: 2px solid #999;
-      border-radius: 8px;
-    }
-    button {
-      background: #0066cc;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:disabled {
-      background: #999;
-      cursor: not-allowed;
-    }
-    #result {
-      margin-top: 1.5rem;
-      text-align: left;
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .card {
-      background: white;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    .label {
-      font-weight: bold;
-    }
+    body { font-family: sans-serif; background: #f0f0f0; color: #222; text-align: center; padding: 20px; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    input, button { font-size: 1.2rem; padding: 0.7rem; margin: 0.5rem 0; width: 90%; max-width: 360px; }
+    button { background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    #result, #debug { margin-top: 1rem; text-align: left; max-width: 360px; margin-left: auto; margin-right: auto; }
+    .card { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .label { font-weight: bold; }
+    pre { background: #eee; padding: 0.5rem; border-radius: 4px; overflow-x: auto; }
   </style>
 </head>
 <body>
   <h1>Tenant Info</h1>
-  <button id="voiceBtn" onclick="startVoice()">🎤 Speak Name</button>
-  <input id="textInput" type="text" placeholder="Or type name here" oninput="fetchData(this.value)">
+  <button onclick="startVoice()">🎤 Speak Name</button><br>
+  <input id="textInput" type="text" placeholder="Or type name" oninput="fetchData(this.value)">
   <div id="result"></div>
+  <h2>Debug Info</h2>
+  <pre id="debug">{ waiting... }</pre>
 
   <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5BTx5oFCrrFKg3E_3SvBGcMcNq6ppqVO4mRV9KsrsyfvA8O2UhAOfFmgOvGfR8RpRPw/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6_b7e9ZkuKctFwv2iv9NKSD3B32Ar7l43soc7GtnzNQl81g7DW_DJvP2joqxzaqd_/exec';
 
     function cleanUp() {
       const old = document.getElementById('jsonp-script');
@@ -71,25 +34,29 @@
     function fetchData(query) {
       cleanUp();
       document.getElementById('result').innerHTML = '';
+      document.getElementById('debug').textContent = '{ waiting... }';
       if (!query) return;
-      const callback = 'displayResult';
-      window[callback] = data => {
-        displayResult(data);
+      const cb = 'handleResponse';
+      window[cb] = function(res) {
+        showResults(res.data);
+        showDebug(res.debug);
         cleanUp();
       };
-      const script = document.createElement('script');
-      script.id  = 'jsonp-script';
-      script.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=${callback}`;
-      document.body.appendChild(script);
+      const s = document.createElement('script');
+      s.id  = 'jsonp-script';
+      s.src = SCRIPT_URL
+            + '?query=' + encodeURIComponent(query)
+            + '&callback=' + cb;
+      document.body.appendChild(s);
     }
 
-    function displayResult(rows) {
-      const container = document.getElementById('result');
+    function showResults(rows) {
+      const c = document.getElementById('result');
+      c.innerHTML = '';
       if (!rows || rows.length === 0) {
-        container.innerHTML = '<p>No results found.</p>';
+        c.innerHTML = '<p>No results found.</p>';
         return;
       }
-      container.innerHTML = '';
       rows.forEach(r => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -100,21 +67,25 @@
           <p><span class="label">Account #:</span> ${r[8]}</p>
           <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
-        container.appendChild(card);
+        c.appendChild(card);
       });
+    }
+
+    function showDebug(debug) {
+      document.getElementById('debug').textContent = JSON.stringify(debug, null, 2);
     }
 
     function startVoice() {
       if (!('webkitSpeechRecognition' in window)) {
-        alert('Voice not supported. Please type.');
+        alert('Voice not supported.');
         return;
       }
       const rec = new webkitSpeechRecognition();
       rec.lang = 'en-IE';
       rec.onresult = e => {
-        const text = e.results[0][0].transcript;
-        document.getElementById('textInput').value = text;
-        fetchData(text);
+        const txt = e.results[0][0].transcript;
+        document.getElementById('textInput').value = txt;
+        fetchData(txt);
       };
       rec.start();
     }
