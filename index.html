@@ -5,26 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tenant Info (Debug)</title>
   <style>
-    body { font-family: sans-serif; background: #f0f0f0; color: #222; text-align: center; padding: 20px; }
-    h1 { font-size: 2rem; margin-bottom: 1rem; }
-    input, button { font-size: 1.2rem; padding: 0.7rem; margin: 0.5rem 0; width: 90%; max-width: 360px; }
-    button { background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
-    #result, #debug { margin-top: 1rem; text-align: left; max-width: 360px; margin-left: auto; margin-right: auto; }
-    .card { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-    .label { font-weight: bold; }
-    pre { background: #eee; padding: 0.5rem; border-radius: 4px; overflow-x: auto; }
+    body { font-family: sans-serif; background: #fafafa; padding:20px; text-align:center; }
+    input, button { font-size:1.2rem; padding:0.8rem; margin:0.5rem; width:90%; max-width:360px; }
+    button { background:#007bff; color:#fff; border:none; border-radius:6px; }
+    .card { background:#fff; padding:1rem; margin:1rem auto; max-width:360px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.1); text-align:left; }
+    .label { font-weight:bold; }
+    pre { text-align:left; background:#eee; padding:1rem; border-radius:6px; max-width:360px; margin:auto; overflow-x:auto; }
   </style>
 </head>
 <body>
   <h1>Tenant Info</h1>
   <button onclick="startVoice()">🎤 Speak Name</button><br>
-  <input id="textInput" type="text" placeholder="Or type name" oninput="fetchData(this.value)">
+  <input id="textInput" placeholder="Or type name here" oninput="fetchData(this.value)">
+  
   <div id="result"></div>
-  <h2>Debug Info</h2>
-  <pre id="debug">{ waiting... }</pre>
+  <h2>Debug Log</h2>
+  <pre id="debug">Waiting for results…</pre>
 
   <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6_b7e9ZkuKctFwv2iv9NKSD3B32Ar7l43soc7GtnzNQl81g7DW_DJvP2joqxzaqd_/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw92-d9nEyBFe3ieiqa3hu_HEqWwLjer_ViZt8SVy49qeT2WSlLaJGacPSUmCsYf7p6bA/exec';
+
+    // Поймаем ошибки JS
+    window.onerror = function(msg, src, line) {
+      document.getElementById('debug').textContent = 'JS Error: ' + msg;
+    };
 
     function cleanUp() {
       const old = document.getElementById('jsonp-script');
@@ -33,30 +37,35 @@
 
     function fetchData(query) {
       cleanUp();
+      document.getElementById('debug').textContent = 'Loading…';
       document.getElementById('result').innerHTML = '';
-      document.getElementById('debug').textContent = '{ waiting... }';
-      if (!query) return;
+      if (!query) {
+        document.getElementById('debug').textContent = 'Enter a name to search.';
+        return;
+      }
       const cb = 'handleResponse';
       window[cb] = function(res) {
-        showResults(res.data);
-        showDebug(res.debug);
+        renderResults(res.data || [], res.error);
+        renderDebug(res.debug, res.error);
         cleanUp();
       };
       const s = document.createElement('script');
       s.id  = 'jsonp-script';
-      s.src = SCRIPT_URL
-            + '?query=' + encodeURIComponent(query)
-            + '&callback=' + cb;
+      s.src = `${SCRIPT_URL}?query=${encodeURIComponent(query)}&callback=handleResponse`;
       document.body.appendChild(s);
     }
 
-    function showResults(rows) {
+    function renderResults(rows, error) {
       const c = document.getElementById('result');
-      c.innerHTML = '';
-      if (!rows || rows.length === 0) {
+      if (error) {
+        c.innerHTML = `<p style="color:red;">Error: ${error}</p>`;
+        return;
+      }
+      if (!rows.length) {
         c.innerHTML = '<p>No results found.</p>';
         return;
       }
+      c.innerHTML = '';
       rows.forEach(r => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -64,15 +73,22 @@
           <p><span class="label">Name:</span> ${r[1]}</p>
           <p><span class="label">Address:</span> ${r[5]}</p>
           <p><span class="label">Phone:</span> ${r[7]}</p>
-          <p><span class="label">Account #:</span> ${r[8]}</p>
+          <p><span class="label">Account:</span> ${r[8]}</p>
           <p><span class="label">Holder:</span> ${r[9]}</p>
         `;
         c.appendChild(card);
       });
     }
 
-    function showDebug(debug) {
-      document.getElementById('debug').textContent = JSON.stringify(debug, null, 2);
+    function renderDebug(debug, error) {
+      const pre = document.getElementById('debug');
+      if (error) {
+        pre.textContent = `Error logged on server: ${error}`;
+      } else if (debug) {
+        pre.textContent = JSON.stringify(debug, null, 2);
+      } else {
+        pre.textContent = 'No debug info.';
+      }
     }
 
     function startVoice() {
