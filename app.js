@@ -221,13 +221,13 @@ function updateSearchHint() {
   if (currentLanguage === 'uk-UA') {
     switch(currentMode) {
       case 'general':
-        searchHint.textContent = "Пошук за будь-якою інформацією: ім'я, адреса, рахунок тощо.";
+        searchHint.textContent = "earch by any information: name, address, account, etc.";
         break;
       case 'name':
-        searchHint.textContent = "Пошук за ім'ям. Підтримуються короткі імена.";
+        searchHint.textContent = "Search by name. Supports short names.";
         break;
       case 'address':
-        searchHint.textContent = "Пошук за Eircode або адресою.";
+        searchHint.textContent = "earch by Eircode or address.";
         break;
     }
   } else {
