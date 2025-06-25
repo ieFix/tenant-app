@@ -12,6 +12,11 @@ const cardsContainer = document.getElementById('cardsContainer');
 const noResults = document.getElementById('noResults');
 const themeToggle = document.getElementById('themeToggle');
 
+// Global variables
+let recognition = null;
+let isListening = false;
+let permissionRequested = false;
+
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
   // Load theme preference
@@ -19,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('dark-theme');
     themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
   }
+  
+  // Initialize voice recognition
+  initVoiceRecognition();
   
   // Load cached data
   loadCache();
@@ -33,6 +41,39 @@ themeToggle.addEventListener('click', () => {
     '<i class="fas fa-sun"></i>' : 
     '<i class="fas fa-moon"></i>';
 });
+
+// Initialize voice recognition
+function initVoiceRecognition() {
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-IE';
+    
+    recognition.onstart = () => {
+      isListening = true;
+      voiceButton.classList.add('listening');
+    };
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      textInput.value = transcript;
+      filterAndRender(transcript);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      handleVoiceError(event.error);
+      resetVoiceButton();
+    };
+    
+    recognition.onend = () => {
+      resetVoiceButton();
+    };
+  } else {
+    voiceButton.style.display = 'none';
+  }
+}
 
 // Load cached data
 function loadCache() {
@@ -53,12 +94,16 @@ function loadCache() {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: tenantData }));
     cleanup('cacheCb');
     loader.style.display = 'none';
-    filterAndRender('');
+    // Don't render anything on initial load
   };
   
   // Load data via JSONP
   const s = document.createElement('script');
   s.src = `${SCRIPT_URL}?callback=cacheCb`;
+  s.onerror = () => {
+    loader.style.display = 'none';
+    alert('Failed to load data. Please check your connection.');
+  };
   document.body.appendChild(s);
 }
 
@@ -72,15 +117,21 @@ function cleanup(cb) {
 // Filter and render results
 function filterAndRender(query) {
   const lowerQuery = query.toLowerCase().trim();
-  const rows = lowerQuery
-    ? tenantData.filter(r => 
-        (r[1] && r[1].toString().toLowerCase().includes(lowerQuery)) || // FullName
-        (r[2] && r[2].toString().toLowerCase().includes(lowerQuery)) || // PPSN
-        (r[5] && r[5].toString().toLowerCase().includes(lowerQuery)) || // Address
-        (r[6] && r[6].toString().toLowerCase().includes(lowerQuery)) || // Eircode
-        (r[7] && r[7].toString().toLowerCase().includes(lowerQuery))    // Phone
-      )
-    : [];
+  
+  // Clear results if query is empty
+  if (!lowerQuery) {
+    cardsContainer.innerHTML = '';
+    noResults.style.display = 'none';
+    return;
+  }
+  
+  const rows = tenantData.filter(r => 
+    (r[1] && r[1].toString().toLowerCase().includes(lowerQuery)) || // FullName
+    (r[2] && r[2].toString().toLowerCase().includes(lowerQuery)) || // PPSN
+    (r[5] && r[5].toString().toLowerCase().includes(lowerQuery)) || // Address
+    (r[6] && r[6].toString().toLowerCase().includes(lowerQuery)) || // Eircode
+    (r[7] && r[7].toString().toLowerCase().includes(lowerQuery))    // Phone
+  );
   
   renderCards(rows);
 }
@@ -89,7 +140,7 @@ function filterAndRender(query) {
 function renderCards(rows) {
   cardsContainer.innerHTML = '';
   
-  if (!rows.length) {
+  if (rows.length === 0) {
     noResults.style.display = 'block';
     return;
   }
@@ -150,23 +201,66 @@ function renderCards(rows) {
 
 // Voice search
 function startVoice() {
-  if (!('webkitSpeechRecognition' in window)) {
-    alert('Voice recognition is not supported in your browser. Please use Chrome or Safari.');
+  if (!recognition) {
+    alert('Voice recognition is not supported in your browser. Please use Chrome or Safari on iOS 14.5+.');
     return;
   }
   
-  const recognition = new webkitSpeechRecognition();
-  recognition.lang = 'en-IE';
-  recognition.onresult = e => {
-    const transcript = e.results[0][0].transcript;
-    textInput.value = transcript;
-    filterAndRender(transcript);
-  };
-  recognition.start();
+  // Request permission on iOS
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !permissionRequested) {
+    DeviceMotionEvent.requestPermission()
+      .then(permissionState => {
+        permissionRequested = true;
+        if (permissionState === 'granted') {
+          startRecognition();
+        } else {
+          alert('Permission to use microphone was denied. Please enable in browser settings.');
+        }
+      })
+      .catch(console.error);
+  } else {
+    startRecognition();
+  }
+}
+
+// Start recognition
+function startRecognition() {
+  if (isListening) return;
   
-  // Visual feedback
-  voiceButton.classList.add('listening');
-  setTimeout(() => voiceButton.classList.remove('listening'), 3000);
+  try {
+    recognition.start();
+  } catch (error) {
+    console.error('Error starting recognition:', error);
+    handleVoiceError(error);
+  }
+}
+
+// Reset voice button state
+function resetVoiceButton() {
+  isListening = false;
+  voiceButton.classList.remove('listening');
+}
+
+// Handle voice errors
+function handleVoiceError(error) {
+  let message = 'Voice recognition failed. Please try again.';
+  
+  switch(error) {
+    case 'no-speech':
+      message = 'No speech detected. Please speak clearly.';
+      break;
+    case 'audio-capture':
+      message = 'Microphone not available. Please check your device settings.';
+      break;
+    case 'not-allowed':
+      message = 'Microphone permission denied. Please enable in browser settings.';
+      break;
+    case 'network':
+      message = 'Network error occurred. Please check your connection.';
+      break;
+  }
+  
+  alert(message);
 }
 
 // Event Listeners
@@ -175,3 +269,16 @@ textInput.addEventListener('input', () => {
 });
 
 voiceButton.addEventListener('click', startVoice);
+
+// Add keyboard shortcut for voice search (v key)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'v' && document.activeElement !== textInput) {
+    startVoice();
+  }
+});
+
+// Clear input when user starts typing
+textInput.addEventListener('focus', () => {
+  textInput.value = '';
+  filterAndRender('');
+});
