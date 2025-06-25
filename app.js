@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQmJN2WeHak4cMicIoF0t_YUuSeheq-XL3QOE7HLOzIPKHog4pV_WLGBPXj5aKkNMgOg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEuKhdIZRVzsQZSIP_WCyEfF1rI9mLnb47efx3EUKNDRGk05EOhi-hCTwGv5KEpzAD5w/exec';
 const CACHE_KEY = 'tenantData';
 const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
 let tenantData = [];
