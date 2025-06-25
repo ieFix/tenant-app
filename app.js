@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5BE0oEXvvuPLXWcoKKnj6sxMU1aLdWqAyDZMlfg6WWkAX6Q4Q8aQUVKr7qj2--zkobg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxz9LNz5YwHtdEn8u7_YzRlDEQP56tMyoWzlHXS9_wavJNwTbdDG7w4bkRhAnvTptslXQ/exec';
 const CACHE_KEY = 'tenantData';
 const CACHE_TIME = 7 * 24 * 60 * 60 * 1000; // 7 days
 let tenantData = [];
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load theme preference
   if (localStorage.getItem('darkTheme') === 'true') {
     document.body.classList.add('dark-theme');
-    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    themeToggle.innerHTML = '<i class="fas fa-sun" style="color: #FFD700;"></i>';
   }
   
   // Initialize voice recognition
@@ -44,7 +44,6 @@ themeToggle.addEventListener('click', () => {
 
 // Initialize voice recognition
 function initVoiceRecognition() {
-  // Проверка поддержки для Android и iOS
   if (isSpeechRecognitionSupported()) {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.continuous = false;
@@ -60,6 +59,7 @@ function initVoiceRecognition() {
       const transcript = event.results[0][0].transcript;
       textInput.value = transcript;
       filterAndRender(transcript);
+      logVoiceQuery(transcript); // Log the voice query
     };
     
     recognition.onerror = (event) => {
@@ -77,7 +77,7 @@ function initVoiceRecognition() {
   }
 }
 
-// Проверка поддержки распознавания речи
+// Check speech recognition support
 function isSpeechRecognitionSupported() {
   return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
 }
@@ -131,13 +131,27 @@ function filterAndRender(query) {
     return;
   }
   
-  const rows = tenantData.filter(r => 
-    (r[1] && r[1].toString().toLowerCase().includes(lowerQuery)) || // FullName
-    (r[2] && r[2].toString().toLowerCase().includes(lowerQuery)) || // PPSN
-    (r[5] && r[5].toString().toLowerCase().includes(lowerQuery)) || // Address
-    (r[6] && r[6].toString().toLowerCase().includes(lowerQuery)) || // Eircode
-    (r[7] && r[7].toString().toLowerCase().includes(lowerQuery))    // Phone
-  );
+  const rows = tenantData.filter(r => {
+    const name = (r[1] || '').toString().toLowerCase();
+    const ppsn = (r[2] || '').toString().toLowerCase();
+    const address = (r[5] || '').toString().toLowerCase();
+    const eircode = (r[6] || '').toString().toLowerCase();
+    const phone = (r[7] || '').toString().toLowerCase();
+    
+    // Check synonyms if available (column index 10)
+    let synonymsMatch = false;
+    if (r[10]) {
+      const synonyms = r[10].toString().toLowerCase().split(',');
+      synonymsMatch = synonyms.some(syn => syn.trim() === lowerQuery);
+    }
+    
+    return name.includes(lowerQuery) || 
+           ppsn.includes(lowerQuery) || 
+           address.includes(lowerQuery) || 
+           eircode.includes(lowerQuery) || 
+           phone.includes(lowerQuery) || 
+           synonymsMatch;
+  });
   
   renderCards(rows);
 }
@@ -205,6 +219,21 @@ function renderCards(rows) {
   });
 }
 
+// Log voice query to Google Sheet
+function logVoiceQuery(query) {
+  if (!query) return;
+  
+  // Create callback for JSONP
+  window.logCallback = function() {
+    cleanup('logCallback');
+  };
+  
+  // Log via JSONP
+  const s = document.createElement('script');
+  s.src = `${SCRIPT_URL}?action=log&query=${encodeURIComponent(query)}&callback=logCallback`;
+  document.body.appendChild(s);
+}
+
 // Voice search
 function startVoice() {
   if (!recognition) {
@@ -212,7 +241,7 @@ function startVoice() {
     return;
   }
   
-  // Запрос разрешения для iOS
+  // Request permission on iOS
   if (isIOS() && !permissionRequested) {
     requestIOSPermission();
     return;
@@ -221,9 +250,8 @@ function startVoice() {
   startRecognition();
 }
 
-// Запрос разрешения для iOS
+// Request permission for iOS
 function requestIOSPermission() {
-  // Для iOS требуется действие пользователя для запроса разрешения
   alert('To use voice search, please allow microphone access in the next prompt.');
   
   if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -238,12 +266,11 @@ function requestIOSPermission() {
       })
       .catch(console.error);
   } else {
-    // Для старых версий iOS
     startRecognition();
   }
 }
 
-// Проверка iOS
+// Check if iOS
 function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
