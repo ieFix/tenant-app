@@ -5,12 +5,13 @@ const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 days
 let tenantData = [];
 let currentMode = 'general';
 let recognition = null;
-let currentLanguage = 'en-US'; // Default language
+let recognitionLanguage = 'en-US'; // 'en-US' или 'uk-UA'
 
 // DOM elements
 const textInput = document.getElementById('textInput');
 const voiceButton = document.getElementById('voiceButton');
 const languageButton = document.getElementById('languageButton');
+const recognitionLabel = document.getElementById('recognitionLabel'); // Новая метка
 const loader = document.getElementById('loader');
 const cardsContainer = document.getElementById('cardsContainer');
 const noResults = document.getElementById('noResults');
@@ -28,11 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // Load language preference
-  const savedLanguage = localStorage.getItem('voiceLanguage');
+  const savedLanguage = localStorage.getItem('recognitionLanguage');
   if (savedLanguage) {
-    currentLanguage = savedLanguage;
-    updateLanguageButton();
+    recognitionLanguage = savedLanguage;
   }
+  
+  // Update UI based on language
+  updateRecognitionLanguage();
   
   // Initialize voice recognition
   initVoiceRecognition();
@@ -67,7 +70,7 @@ function setupEventListeners() {
   voiceButton.addEventListener('click', startVoiceRecognition);
   
   // Language toggle
-  languageButton.addEventListener('click', toggleLanguage);
+  languageButton.addEventListener('click', toggleRecognitionLanguage);
   
   // Mode switching
   modeButtons.forEach(btn => {
@@ -81,7 +84,7 @@ function setupEventListeners() {
   
   // Click outside to hide suggestions
   document.addEventListener('click', (e) => {
-    if (!suggestionsContainer.contains(e.target)) {
+    if (!suggestionsContainer.contains(e.target) {
       hideSuggestions();
     }
   });
@@ -94,15 +97,13 @@ function setupEventListeners() {
 function initVoiceRecognition() {
   if ('webkitSpeechRecognition' in window) {
     recognition = new webkitSpeechRecognition();
-    recognition.lang = currentLanguage;
+    recognition.lang = recognitionLanguage;
     recognition.continuous = false;
     recognition.maxAlternatives = 5; // Get multiple alternatives
     
     recognition.onstart = () => {
       voiceButton.classList.add('listening');
-      searchHint.textContent = currentLanguage === 'uk-UA' 
-        ? "Listening for Ukrainian names..." 
-        : "Listening for English names...";
+      searchHint.textContent = "Listening... Speak now";
     };
     
     recognition.onresult = (e) => {
@@ -110,14 +111,12 @@ function initVoiceRecognition() {
         .map(result => result.transcript.trim())
         .filter(transcript => transcript.length > 0);
       
-      // Use the shortest alternative (usually most accurate)
-      const bestMatch = alternatives.reduce((shortest, current) => 
-        current.length < shortest.length ? current : shortest, alternatives[0]
-      );
+      // Use the best alternative
+      const bestMatch = alternatives[0];
       
-      // For Ukrainian, transliterate to Latin
+      // For Ukrainian mode, transliterate to Latin
       let finalText = bestMatch;
-      if (currentLanguage === 'uk-UA') {
+      if (recognitionLanguage === 'uk-UA') {
         finalText = transliterate(bestMatch);
       }
       
@@ -129,7 +128,7 @@ function initVoiceRecognition() {
     };
     
     recognition.onerror = (e) => {
-      let message = "Sorry, I didn't catch that. Please type instead.";
+      let message = "Sorry, I didn't catch that. Please try typing.";
       
       switch(e.error) {
         case 'no-speech':
@@ -164,13 +163,7 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya',
-    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G',
-    'Д': 'D', 'Е': 'E', 'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
-    'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
-    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
-    'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
-    'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya',
-    'ь': '', '\'': '', '`': '', ' ': ' '
+    'ь': '', '\'': '', '`': ''
   };
 
   return text.split('').map(char => 
@@ -179,25 +172,30 @@ function transliterate(text) {
 }
 
 // Toggle recognition language
-function toggleLanguage() {
-  currentLanguage = currentLanguage === 'en-US' ? 'uk-UA' : 'en-US';
-  localStorage.setItem('voiceLanguage', currentLanguage);
-  updateLanguageButton();
+function toggleRecognitionLanguage() {
+  recognitionLanguage = recognitionLanguage === 'en-US' ? 'uk-UA' : 'en-US';
+  localStorage.setItem('recognitionLanguage', recognitionLanguage);
   
+  // Update recognition engine
   if (recognition) {
-    recognition.lang = currentLanguage;
+    recognition.lang = recognitionLanguage;
   }
   
-  searchHint.textContent = currentLanguage === 'uk-UA' 
-    ? "Ukrainian recognition enabled" 
-    : "English recognition enabled";
-  setTimeout(() => updateSearchHint(), 2000);
+  // Update UI
+  updateRecognitionLanguage();
 }
 
-// Update language button
-function updateLanguageButton() {
-  languageButton.textContent = currentLanguage === 'uk-UA' ? 'UA' : 'EN';
+// Update recognition language UI
+function updateRecognitionLanguage() {
+  if (recognitionLanguage === 'en-US') {
+    languageButton.textContent = "Switch to Ukrainian";
+    recognitionLabel.textContent = "Recognition: English names";
+  } else {
+    languageButton.textContent = "Switch to English";
+    recognitionLabel.textContent = "Recognition: Ukrainian names";
+  }
 }
+
 
 // Sanitize user input
 function sanitizeInput(input) {
