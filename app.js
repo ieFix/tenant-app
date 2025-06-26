@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKz3036-p2DP3bf1dI0soxVNDg5ks24uipoGdoTRxDoBUk0mk__SKRvWkkg88v0Cza0Q/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbknV_Ow0uJg904gNzE_SJl4tHQ3PbiszJ4SMkokUGrOff035k8cdsKsuq106sg0JP_A/exec';
 const CACHE_KEY = 'tenantData';
 let tenantData = [];
 let currentMode = 'general';
@@ -95,7 +95,13 @@ function toggleTheme() {
 function handleSearchInput() {
   const safeQuery = sanitizeInput(textInput.value);
   filterAndRender(safeQuery);
-  showSuggestions(safeQuery);
+  
+  // Показываем подсказки только в режимах Name и Address
+  if (currentMode !== 'general') {
+    showSuggestions(safeQuery);
+  } else {
+    hideSuggestions();
+  }
 }
 
 // Initialize voice recognition
@@ -119,6 +125,9 @@ function initVoiceRecognition() {
       if (recognitionLanguage === 'uk-UA') {
         finalText = transliterate(transcript);
       }
+      
+      // Удаляем знаки препинания и лишние пробелы
+      finalText = finalText.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ");
       
       // Sanitize and set input
       const safeInput = sanitizeInput(finalText);
@@ -147,13 +156,7 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya',
-    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G',
-    'Д': 'D', 'Е': 'E', 'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
-    'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
-    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
-    'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
-    'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya',
-    'ь': '', '\'': '', '`': ''
+    'ь': '', '\'': '', '`': '', '’': ''
   };
 
   return text.split('').map(char => 
@@ -204,7 +207,8 @@ function handleRecognitionError(error) {
 
 // Sanitize user input
 function sanitizeInput(input) {
-  return input.substring(0, 100);
+  // Удаляем знаки препинания и лишние пробелы
+  return input.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").substring(0, 100);
 }
 
 // Reset voice button
@@ -229,16 +233,20 @@ function loadData() {
   getLastModified().then(serverLastModified => {
     const stored = localStorage.getItem(CACHE_KEY);
     const cacheData = stored ? JSON.parse(stored) : null;
+    const serverTime = serverLastModified.getTime();
     
-    // Load from cache if data is fresh
-    if (cacheData && serverLastModified <= new Date(cacheData.lastModified)) {
-      tenantData = cacheData.data;
-      loader.style.display = 'none';
-      if (textInput.value) filterAndRender(textInput.value);
-      return;
+    // Если в кеше есть данные и дата последнего изменения в кеше не меньше серверной
+    if (cacheData && cacheData.lastModified) {
+      const cacheTime = new Date(cacheData.lastModified).getTime();
+      if (serverTime <= cacheTime) {
+        tenantData = cacheData.data;
+        loader.style.display = 'none';
+        if (textInput.value) filterAndRender(textInput.value);
+        return;
+      }
     }
     
-    // Otherwise fetch new data
+    // Иначе загружаем новые данные
     fetchData(serverLastModified);
   }).catch(err => {
     console.error('Cache check error:', err);
@@ -338,27 +346,28 @@ function checkNameMatch(row, query) {
 function checkAddressMatch(row, query) {
   return (
     safeIncludes(row[5], query) || 
-    safeIncludes(row[6], query)
+    safeIncludes(row[6], query))
   );
 }
 
 // Safe includes check
 function safeIncludes(value, query) {
-  return value && value.toString().toLowerCase().includes(query);
+  if (!value) return false;
+  const cleanValue = value.toString().toLowerCase().replace(/[^\w\s]|_/g, "");
+  return cleanValue.includes(query);
 }
 
 // Check synonyms
 function checkSynonyms(synonyms, query) {
   if (!synonyms) return false;
   
-  const synonymList = synonyms.toString().toLowerCase().split(',');
-  const cleanQuery = query.replace(/[^a-z0-9]/gi, '');
+  const synonymList = synonyms.toString().toLowerCase().replace(/[^\w\s]|_/g, "").split(',');
   
   return synonymList.some(syn => {
-    const cleanSyn = syn.trim().replace(/[^a-z0-9]/gi, '');
-    return cleanSyn === cleanQuery || 
-           cleanSyn.includes(cleanQuery) || 
-           cleanQuery.includes(cleanSyn);
+    const cleanSyn = syn.trim();
+    return cleanSyn === query || 
+           cleanSyn.includes(query) || 
+           query.includes(cleanSyn);
   });
 }
 
@@ -404,7 +413,7 @@ function renderCards(rows) {
         </div>
         <div class="info-group">
           <div class="info-label">Phone</div>
-          <div class="info-value">${formatPhone(row[7] || 'Unknown')}</div>
+          <div class="info-value">${formatPhone(row[7])}</div>
         </div>
         <div class="info-group">
           <div class="info-label">PPSN</div>
@@ -427,13 +436,30 @@ function renderCards(rows) {
 
 // Format phone numbers
 function formatPhone(phone) {
-  if (!phone || typeof phone !== 'string') return 'Unknown';
-  return phone.replace(/(\+\d{2})(\d{3})(\d{3})(\d{3})/, '$1 $2 $3 $4');
+  if (!phone || phone === 'Unknown') return 'Unknown';
+  
+  // Удаляем все нечисловые символы, кроме плюса в начале
+  const cleaned = phone.toString().replace(/(?!^\+)\D/g, '');
+  
+  // Форматируем номер телефона
+  const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
+  if (match) {
+    return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
+  }
+  
+  // Если формат не распознан, возвращаем оригинал
+  return phone;
 }
 
 // Show suggestions
 function showSuggestions(query) {
   suggestionsContainer.innerHTML = '';
+  
+  // Не показываем подсказки в общем режиме
+  if (currentMode === 'general') {
+    hideSuggestions();
+    return;
+  }
   
   if (query.length < 2) {
     hideSuggestions();
@@ -443,13 +469,6 @@ function showSuggestions(query) {
   let suggestions = [];
   
   switch(currentMode) {
-    case 'general':
-      suggestions = [
-        ...tenantData.map(row => row[1]), // names
-        ...tenantData.map(row => row[5]), // addresses
-        ...tenantData.map(row => row[6])  // eircodes
-      ].filter(Boolean);
-      break;
     case 'name':
       suggestions = tenantData.map(row => row[1]).filter(Boolean); // names
       break;
@@ -518,6 +537,15 @@ function setSearchMode(mode) {
   });
   
   updateSearchHint();
+  
+  // Обновляем подсказки при смене режима
+  const safeQuery = sanitizeInput(textInput.value);
+  if (safeQuery) {
+    filterAndRender(safeQuery);
+    if (mode !== 'general') {
+      showSuggestions(safeQuery);
+    }
+  }
 }
 
 // Cleanup JSONP scripts
