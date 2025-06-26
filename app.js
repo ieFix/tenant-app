@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzY83pfKvOlPgaee6HAKqMqmZ8flsWDbgu9__veAnDGncCm77xGseSMhIVbGJegaiqSYQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbynSvt-Z9OCYBD_g_Tw1ph6WL9W_OesHPeZzGSrFSYMrQ30kypOzYqnxpkgD7AXl4mLKg/exec';
 const CACHE_KEY = 'tenantData';
 const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 days
 let tenantData = [];
@@ -163,6 +163,12 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G',
+    'Д': 'D', 'Е': 'E', 'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
+    'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
+    'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
+    'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya',
     'ь': '', '\'': '', '`': ''
   };
 
@@ -188,11 +194,11 @@ function toggleRecognitionLanguage() {
 // Update recognition language UI
 function updateRecognitionLanguage() {
   if (recognitionLanguage === 'en-US') {
-    languageButton.textContent = "Switch to Ukrainian";
-    recognitionLabel.textContent = "Recognition: English names";
+    languageButton.textContent = "UA";
+    recognitionLabel.textContent = "Voice search: English names";
   } else {
-    languageButton.textContent = "Switch to English";
-    recognitionLabel.textContent = "Recognition: Ukrainian names";
+    languageButton.textContent = "EN";
+    recognitionLabel.textContent = "Voice search: Ukrainian names";
   }
 }
 
@@ -229,33 +235,30 @@ function updateSearchHint() {
 function loadData() {
   const stored = localStorage.getItem(CACHE_KEY);
   
-  // Check data freshness
   getLastModified().then(serverLastModified => {
-    if (stored) {
-      const { data, timestamp, lastModified } = JSON.parse(stored);
-      
-      // Use cache if data is fresh
-      if (lastModified === serverLastModified && Date.now() - timestamp < CACHE_TIME) {
-        tenantData = data;
-        return;
-      }
+    // Всегда загружать данные, если кеш устарел
+    if (!stored || serverLastModified > new Date(JSON.parse(stored).lastModified)) {
+      fetchData(serverLastModified);
+    } else {
+      // Использовать кеш, если данные свежие
     }
-    
-    // Fetch new data
-    fetchData(serverLastModified);
+  }).catch(err => {
+    console.error('Cache check error:', err);
+    fetchData(new Date(0));
   });
 }
 
 // Get last modified date from server
 function getLastModified() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     window.lastModifiedCb = resp => {
       cleanup('lastModifiedCb');
-      resolve(resp.lastModified);
+      resolve(new Date(resp.lastModified));
     };
     
     const s = document.createElement('script');
     s.src = `${SCRIPT_URL}?action=lastmodified&callback=lastModifiedCb`;
+    s.onerror = () => reject(new Error('Failed to load last modified'));
     document.body.appendChild(s);
   });
 }
@@ -284,6 +287,10 @@ function fetchData(lastModified) {
   
   const s = document.createElement('script');
   s.src = `${SCRIPT_URL}?callback=dataCb`;
+  s.onerror = () => {
+    loader.style.display = 'none';
+    searchHint.textContent = "Failed to load data. Please refresh the page.";
+  };
   document.body.appendChild(s);
 }
 
@@ -414,8 +421,8 @@ function renderCards(rows) {
 
 // Format phone numbers
 function formatPhone(phone) {
-  if (!phone) return 'Unknown';
-  return phone.toString().replace(/(\+\d{2})(\d{3})(\d{3})(\d{3})/, '$1 $2 $3 $4');
+  if (!phone || typeof phone !== 'string') return 'Unknown';
+  return phone.replace(/(\+\d{2})(\d{3})(\d{3})(\d{3})/, '$1 $2 $3 $4');
 }
 
 // Show suggestions

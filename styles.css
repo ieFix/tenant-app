@@ -84,7 +84,7 @@ body {
 /* Search Bar */
 .search-container {
   position: relative;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
 }
 
 .search-input {
@@ -172,19 +172,23 @@ body {
 }
 
 .language-toggle {
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
   background: var(--card-bg);
   border: 1px solid var(--border);
   color: var(--text);
   cursor: pointer;
   font-size: 14px;
-  padding: 8px 16px;
-  border-radius: 24px;
+  font-weight: bold;
+  width: 40px;
+  height: 30px;
+  border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
   z-index: 10;
-  white-space: nowrap;
 }
 
 .language-toggle:hover {
@@ -194,12 +198,9 @@ body {
 
 .recognition-label {
   font-size: 14px;
-  color: var(--text);
-  padding: 8px 12px;
-  background: var(--card-bg);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  flex-grow: 1;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 /* Suggestions Container */
