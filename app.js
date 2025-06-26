@@ -218,11 +218,11 @@ function toggleRecognitionLanguage() {
 // Update recognition language UI
 function updateRecognitionLanguage() {
   if (recognitionLanguage === 'en-US') {
-    languageButton.textContent = "UA";
+    languageButton.textContent = "EN";
     languageButton.title = "Switch to Ukrainian";
     recognitionLabel.textContent = "Voice search: English names";
   } else {
-    languageButton.textContent = "EN";
+    languageButton.textContent = "UA";
     languageButton.title = "Switch to English";
     recognitionLabel.textContent = "Voice search: Ukrainian names";
   }
