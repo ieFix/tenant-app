@@ -163,12 +163,11 @@ body {
 }
 
 /* Recognition controls */
-.recognition-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 15px;
+.recognition-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .language-toggle {
@@ -194,13 +193,6 @@ body {
 .language-toggle:hover {
   background-color: var(--primary-light);
   border-color: var(--primary);
-}
-
-.recognition-label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: 10px;
-  text-align: center;
 }
 
 /* Suggestions Container */
@@ -448,14 +440,13 @@ body {
     font-size: 17px;
   }
   
-  .recognition-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .language-toggle, .recognition-label {
-    width: 100%;
-    text-align: center;
+  .language-toggle {
+    width: 40px;
+    height: 30px;
+    border-radius: 15px;
+    right: 60px;
+    top: 50%;
+    transform: translateY(-50%);
   }
   
   .mode-btn {

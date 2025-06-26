@@ -1,11 +1,10 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbynSvt-Z9OCYBD_g_Tw1ph6WL9W_OesHPeZzGSrFSYMrQ30kypOzYqnxpkgD7AXl4mLKg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKz3036-p2DP3bf1dI0soxVNDg5ks24uipoGdoTRxDoBUk0mk__SKRvWkkg88v0Cza0Q/exec';
 const CACHE_KEY = 'tenantData';
-const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 days
 let tenantData = [];
 let currentMode = 'general';
 let recognition = null;
-let recognitionLanguage = 'en-US'; // 'en-US' или 'uk-UA'
+let recognitionLanguage = 'en-US';
 
 // DOM elements
 const textInput = document.getElementById('textInput');
@@ -40,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize voice recognition
   initVoiceRecognition();
   
+  // Set focus to search input
+  textInput.focus();
+  
   // Load data
   loadData();
   
@@ -50,21 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Set up event listeners
 function setupEventListeners() {
   // Theme toggle
-  themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('dark-theme');
-    const isDarkMode = document.body.classList.contains('dark-theme');
-    localStorage.setItem('darkTheme', isDarkMode);
-    themeToggle.innerHTML = isDarkMode ? 
-      '<i class="fas fa-sun"></i>' : 
-      '<i class="fas fa-moon"></i>';
-  });
+  themeToggle.addEventListener('click', toggleTheme);
   
   // Text input search
-  textInput.addEventListener('input', () => {
-    const safeQuery = sanitizeInput(textInput.value);
-    filterAndRender(safeQuery);
-    showSuggestions(safeQuery);
-  });
+  textInput.addEventListener('input', handleSearchInput);
   
   // Voice input
   voiceButton.addEventListener('click', startVoiceRecognition);
@@ -88,9 +79,23 @@ function setupEventListeners() {
       hideSuggestions();
     }
   });
-  
-  // Set default mode
-  setSearchMode('general');
+}
+
+// Toggle theme
+function toggleTheme() {
+  document.body.classList.toggle('dark-theme');
+  const isDarkMode = document.body.classList.contains('dark-theme');
+  localStorage.setItem('darkTheme', isDarkMode);
+  themeToggle.innerHTML = isDarkMode ? 
+    '<i class="fas fa-sun"></i>' : 
+    '<i class="fas fa-moon"></i>';
+}
+
+// Handle search input
+function handleSearchInput() {
+  const safeQuery = sanitizeInput(textInput.value);
+  filterAndRender(safeQuery);
+  showSuggestions(safeQuery);
 }
 
 // Initialize voice recognition
@@ -107,17 +112,12 @@ function initVoiceRecognition() {
     };
     
     recognition.onresult = (e) => {
-      const alternatives = Array.from(e.results[0])
-        .map(result => result.transcript.trim())
-        .filter(transcript => transcript.length > 0);
+      const transcript = e.results[0][0].transcript.trim();
+      let finalText = transcript;
       
-      // Use the best alternative
-      const bestMatch = alternatives[0];
-      
-      // For Ukrainian mode, transliterate to Latin
-      let finalText = bestMatch;
+      // Transliterate for Ukrainian
       if (recognitionLanguage === 'uk-UA') {
-        finalText = transliterate(bestMatch);
+        finalText = transliterate(transcript);
       }
       
       // Sanitize and set input
@@ -128,23 +128,7 @@ function initVoiceRecognition() {
     };
     
     recognition.onerror = (e) => {
-      let message = "Sorry, I didn't catch that. Please try typing.";
-      
-      switch(e.error) {
-        case 'no-speech':
-          message = "No speech detected. Please type instead.";
-          break;
-        case 'audio-capture':
-          message = "Microphone not available. Please type.";
-          break;
-        case 'not-allowed':
-          message = "Microphone access denied. Please allow access in settings.";
-          break;
-      }
-      
-      searchHint.textContent = message;
-      resetVoiceButton();
-      setTimeout(() => updateSearchHint(), 3000);
+      handleRecognitionError(e.error);
     };
     
     recognition.onend = resetVoiceButton;
@@ -182,12 +166,10 @@ function toggleRecognitionLanguage() {
   recognitionLanguage = recognitionLanguage === 'en-US' ? 'uk-UA' : 'en-US';
   localStorage.setItem('recognitionLanguage', recognitionLanguage);
   
-  // Update recognition engine
   if (recognition) {
     recognition.lang = recognitionLanguage;
   }
   
-  // Update UI
   updateRecognitionLanguage();
 }
 
@@ -195,19 +177,34 @@ function toggleRecognitionLanguage() {
 function updateRecognitionLanguage() {
   if (recognitionLanguage === 'en-US') {
     languageButton.textContent = "UA";
+    languageButton.title = "Switch to Ukrainian";
     recognitionLabel.textContent = "Voice search: English names";
   } else {
     languageButton.textContent = "EN";
+    languageButton.title = "Switch to English";
     recognitionLabel.textContent = "Voice search: Ukrainian names";
   }
+  updateSearchHint();
+}
+
+// Handle recognition errors
+function handleRecognitionError(error) {
+  let message = "Sorry, I didn't catch that. Please try typing.";
+  
+  switch(error) {
+    case 'no-speech': message = "No speech detected. Please type instead."; break;
+    case 'audio-capture': message = "Microphone not available. Please type."; break;
+    case 'not-allowed': message = "Microphone access denied. Please allow access in settings."; break;
+  }
+  
+  searchHint.textContent = message;
+  resetVoiceButton();
+  setTimeout(updateSearchHint, 3000);
 }
 
 // Sanitize user input
 function sanitizeInput(input) {
-  return input
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .substring(0, 100);
+  return input.substring(0, 100);
 }
 
 // Reset voice button
@@ -219,29 +216,30 @@ function resetVoiceButton() {
 // Update search hint based on mode
 function updateSearchHint() {
   switch(currentMode) {
-    case 'general':
-      searchHint.textContent = "Search by any information: name, address, account, etc.";
-      break;
-    case 'name':
-      searchHint.textContent = "Search by name. Supports short names.";
-      break;
-    case 'address':
-      searchHint.textContent = "Search by Eircode or address.";
-      break;
+    case 'general': searchHint.textContent = "Search by any information: name, address, account, etc."; break;
+    case 'name': searchHint.textContent = "Search by name. Supports short names."; break;
+    case 'address': searchHint.textContent = "Search by Eircode or address."; break;
   }
 }
 
 // Load data
 function loadData() {
-  const stored = localStorage.getItem(CACHE_KEY);
+  loader.style.display = 'flex';
   
   getLastModified().then(serverLastModified => {
-    // Всегда загружать данные, если кеш устарел
-    if (!stored || serverLastModified > new Date(JSON.parse(stored).lastModified)) {
-      fetchData(serverLastModified);
-    } else {
-      // Использовать кеш, если данные свежие
+    const stored = localStorage.getItem(CACHE_KEY);
+    const cacheData = stored ? JSON.parse(stored) : null;
+    
+    // Load from cache if data is fresh
+    if (cacheData && serverLastModified <= new Date(cacheData.lastModified)) {
+      tenantData = cacheData.data;
+      loader.style.display = 'none';
+      if (textInput.value) filterAndRender(textInput.value);
+      return;
     }
+    
+    // Otherwise fetch new data
+    fetchData(serverLastModified);
   }).catch(err => {
     console.error('Cache check error:', err);
     fetchData(new Date(0));
@@ -265,24 +263,20 @@ function getLastModified() {
 
 // Fetch data from server
 function fetchData(lastModified) {
-  loader.style.display = 'flex';
-  
   window.dataCb = resp => {
     tenantData = resp.data || [];
     
-    // Save to cache with last modified date
+    // Save to cache
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
-      timestamp: Date.now(),
       lastModified: lastModified
     }));
     
     cleanup('dataCb');
     loader.style.display = 'none';
     
-    // Apply current search if any
-    const safeQuery = sanitizeInput(textInput.value);
-    if (safeQuery) filterAndRender(safeQuery);
+    // Apply current search
+    if (textInput.value) filterAndRender(textInput.value);
   };
   
   const s = document.createElement('script');
@@ -298,7 +292,6 @@ function fetchData(lastModified) {
 function filterAndRender(query) {
   const cleanQuery = query.toLowerCase().trim();
   
-  // Clear results on empty query
   if (!cleanQuery) {
     cardsContainer.innerHTML = '';
     noResults.style.display = 'none';
@@ -307,16 +300,11 @@ function filterAndRender(query) {
   }
   
   const rows = tenantData.filter(row => {
-    // Filter based on current mode
     switch(currentMode) {
-      case 'general':
-        return checkGeneralMatch(row, cleanQuery);
-      case 'name':
-        return checkNameMatch(row, cleanQuery);
-      case 'address':
-        return checkAddressMatch(row, cleanQuery);
-      default:
-        return false;
+      case 'general': return checkGeneralMatch(row, cleanQuery);
+      case 'name': return checkNameMatch(row, cleanQuery);
+      case 'address': return checkAddressMatch(row, cleanQuery);
+      default: return false;
     }
   });
   
@@ -338,6 +326,22 @@ function checkGeneralMatch(row, query) {
   );
 }
 
+// Check match in name mode
+function checkNameMatch(row, query) {
+  return (
+    safeIncludes(row[1], query) || 
+    (row[10] && checkSynonyms(row[10], query))
+  );
+}
+
+// Check match in address mode
+function checkAddressMatch(row, query) {
+  return (
+    safeIncludes(row[5], query) || 
+    safeIncludes(row[6], query)
+  );
+}
+
 // Safe includes check
 function safeIncludes(value, query) {
   return value && value.toString().toLowerCase().includes(query);
@@ -352,7 +356,9 @@ function checkSynonyms(synonyms, query) {
   
   return synonymList.some(syn => {
     const cleanSyn = syn.trim().replace(/[^a-z0-9]/gi, '');
-    return cleanSyn === cleanQuery || cleanSyn.includes(cleanQuery);
+    return cleanSyn === cleanQuery || 
+           cleanSyn.includes(cleanQuery) || 
+           cleanQuery.includes(cleanSyn);
   });
 }
 
@@ -436,7 +442,6 @@ function showSuggestions(query) {
   
   let suggestions = [];
   
-  // Depending on mode, suggest different things
   switch(currentMode) {
     case 'general':
       suggestions = [
@@ -456,7 +461,7 @@ function showSuggestions(query) {
       break;
   }
   
-  // Remove duplicates and filter by query
+  // Filter and deduplicate
   const uniqueSuggestions = [...new Set(suggestions)];
   const matches = uniqueSuggestions.filter(s => 
     s.toLowerCase().includes(query.toLowerCase())
@@ -501,46 +506,17 @@ function logVoiceQuery(query) {
 // Start voice recognition
 function startVoiceRecognition() {
   if (!recognition) return;
-  
-  // For iOS, request permission
-  if (isIOS() && !window.voicePermissionRequested) {
-    requestIOSPermission();
-    return;
-  }
-  
   recognition.start();
-}
-
-// Request iOS permission
-function requestIOSPermission() {
-  alert('For voice input, microphone access is required.');
-  
-  if (typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission()
-      .then(permissionState => {
-        window.voicePermissionRequested = true;
-        if (permissionState === 'granted') {
-          recognition.start();
-        }
-      });
-  }
-}
-
-// Check if iOS
-function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
 // Set search mode
 function setSearchMode(mode) {
   currentMode = mode;
   
-  // Update active button
   modeButtons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
   
-  // Update hint
   updateSearchHint();
 }
 
