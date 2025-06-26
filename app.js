@@ -11,7 +11,7 @@ let recognitionLanguage = 'en-US'; // 'en-US' или 'uk-UA'
 const textInput = document.getElementById('textInput');
 const voiceButton = document.getElementById('voiceButton');
 const languageButton = document.getElementById('languageButton');
-const recognitionLabel = document.getElementById('recognitionLabel'); // Новая метка
+const recognitionLabel = document.getElementById('recognitionLabel');
 const loader = document.getElementById('loader');
 const cardsContainer = document.getElementById('cardsContainer');
 const noResults = document.getElementById('noResults');
@@ -84,7 +84,7 @@ function setupEventListeners() {
   
   // Click outside to hide suggestions
   document.addEventListener('click', (e) => {
-    if (!suggestionsContainer.contains(e.target) {
+    if (!suggestionsContainer.contains(e.target)) {
       hideSuggestions();
     }
   });
@@ -99,7 +99,7 @@ function initVoiceRecognition() {
     recognition = new webkitSpeechRecognition();
     recognition.lang = recognitionLanguage;
     recognition.continuous = false;
-    recognition.maxAlternatives = 5; // Get multiple alternatives
+    recognition.maxAlternatives = 5;
     
     recognition.onstart = () => {
       voiceButton.classList.add('listening');
@@ -196,16 +196,12 @@ function updateRecognitionLanguage() {
   }
 }
 
-
 // Sanitize user input
 function sanitizeInput(input) {
   return input
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    .substring(0, 100); // Limit input length
+    .substring(0, 100);
 }
 
 // Reset voice button
@@ -216,30 +212,16 @@ function resetVoiceButton() {
 
 // Update search hint based on mode
 function updateSearchHint() {
-  if (currentLanguage === 'uk-UA') {
-    switch(currentMode) {
-      case 'general':
-        searchHint.textContent = "earch by any information: name, address, account, etc.";
-        break;
-      case 'name':
-        searchHint.textContent = "Search by name. Supports short names.";
-        break;
-      case 'address':
-        searchHint.textContent = "earch by Eircode or address.";
-        break;
-    }
-  } else {
-    switch(currentMode) {
-      case 'general':
-        searchHint.textContent = "Search by any information: name, address, account, etc.";
-        break;
-      case 'name':
-        searchHint.textContent = "Search by name. Supports short names.";
-        break;
-      case 'address':
-        searchHint.textContent = "Search by Eircode or address.";
-        break;
-    }
+  switch(currentMode) {
+    case 'general':
+      searchHint.textContent = "Search by any information: name, address, account, etc.";
+      break;
+    case 'name':
+      searchHint.textContent = "Search by name. Supports short names.";
+      break;
+    case 'address':
+      searchHint.textContent = "Search by Eircode or address.";
+      break;
   }
 }
 
@@ -283,15 +265,7 @@ function fetchData(lastModified) {
   loader.style.display = 'flex';
   
   window.dataCb = resp => {
-    // Validate and sanitize response
-    if (!Array.isArray(resp.data)) {
-      console.error('Invalid data format received');
-      tenantData = [];
-    } else {
-      tenantData = resp.data.map(row => 
-        row.map(cell => typeof cell === 'string' ? sanitizeInput(cell) : cell)
-      );
-    }
+    tenantData = resp.data || [];
     
     // Save to cache with last modified date
     localStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -371,11 +345,11 @@ function checkSynonyms(synonyms, query) {
   
   return synonymList.some(syn => {
     const cleanSyn = syn.trim().replace(/[^a-z0-9]/gi, '');
-    return cleanSyn === cleanQuery;
+    return cleanSyn === cleanQuery || cleanSyn.includes(cleanQuery);
   });
 }
 
-// Render cards safely
+// Render cards
 function renderCards(rows) {
   cardsContainer.innerHTML = '';
   
@@ -396,81 +370,55 @@ function renderCards(rows) {
     const lastName = names.length > 1 ? names[names.length - 1] : firstName;
     const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
     
-    // Safe content creation
-    const header = document.createElement('div');
-    header.className = 'card-header';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="avatar">${initials}</div>
+        <div class="tenant-info">
+          <div class="tenant-name">${row[1] || 'Unknown'}</div>
+          <div class="tenant-location">
+            <i class="fas fa-map-marker-alt"></i> ${row[4] || 'Unknown'}, ${row[3] || 'Unknown'}
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="info-group">
+          <div class="info-label">Address</div>
+          <div class="info-value">${row[5] || 'Unknown'}</div>
+        </div>
+        <div class="info-group">
+          <div class="info-label">Eircode</div>
+          <div class="info-value">${row[6] || 'Unknown'}</div>
+        </div>
+        <div class="info-group">
+          <div class="info-label">Phone</div>
+          <div class="info-value">${formatPhone(row[7] || 'Unknown')}</div>
+        </div>
+        <div class="info-group">
+          <div class="info-label">PPSN</div>
+          <div class="info-value">${row[2] || 'Unknown'}</div>
+        </div>
+        <div class="info-group">
+          <div class="info-label">Electricity Account</div>
+          <div class="info-value">${row[8] || 'Unknown'}</div>
+        </div>
+        <div class="info-group">
+          <div class="info-label">Account Holder</div>
+          <div class="info-value">${row[9] || 'Unknown'}</div>
+        </div>
+      </div>
+    `;
     
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    avatar.textContent = initials;
-    
-    const tenantInfo = document.createElement('div');
-    tenantInfo.className = 'tenant-info';
-    
-    const tenantName = document.createElement('div');
-    tenantName.className = 'tenant-name';
-    tenantName.textContent = row[1] || 'Unknown';
-    
-    const tenantLocation = document.createElement('div');
-    tenantLocation.className = 'tenant-location';
-    
-    const locationIcon = document.createElement('i');
-    locationIcon.className = 'fas fa-map-marker-alt';
-    
-    const locationText = document.createTextNode(` ${row[4] || 'Unknown'}, ${row[3] || 'Unknown'}`);
-    
-    tenantLocation.appendChild(locationIcon);
-    tenantLocation.appendChild(locationText);
-    
-    tenantInfo.appendChild(tenantName);
-    tenantInfo.appendChild(tenantLocation);
-    
-    header.appendChild(avatar);
-    header.appendChild(tenantInfo);
-    
-    const body = document.createElement('div');
-    body.className = 'card-body';
-    
-    // Create info groups safely
-    const fields = [
-      { label: 'Address', value: row[5] },
-      { label: 'Eircode', value: row[6] },
-      { label: 'Phone', value: formatPhone(row[7]) },
-      { label: 'PPSN', value: row[2] },
-      { label: 'Electricity Account', value: row[8] },
-      { label: 'Account Holder', value: row[9] }
-    ];
-    
-    fields.forEach(field => {
-      const group = document.createElement('div');
-      group.className = 'info-group';
-      
-      const label = document.createElement('div');
-      label.className = 'info-label';
-      label.textContent = field.label;
-      
-      const value = document.createElement('div');
-      value.className = 'info-value';
-      value.textContent = field.value || 'Unknown';
-      
-      group.appendChild(label);
-      group.appendChild(value);
-      body.appendChild(group);
-    });
-    
-    card.appendChild(header);
-    card.appendChild(body);
     cardsContainer.appendChild(card);
   });
 }
 
-// Format phone numbers safely
+// Format phone numbers
 function formatPhone(phone) {
   if (!phone) return 'Unknown';
   return phone.toString().replace(/(\+\d{2})(\d{3})(\d{3})(\d{3})/, '$1 $2 $3 $4');
 }
 
-// Show suggestions safely
+// Show suggestions
 function showSuggestions(query) {
   suggestionsContainer.innerHTML = '';
   
@@ -558,11 +506,7 @@ function startVoiceRecognition() {
 
 // Request iOS permission
 function requestIOSPermission() {
-  const message = currentLanguage === 'uk-UA' 
-    ? "Для використання голосового вводу потрібен доступ до мікрофона." 
-    : "For voice input, microphone access is required.";
-  
-  alert(message);
+  alert('For voice input, microphone access is required.');
   
   if (typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission()

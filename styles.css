@@ -84,7 +84,7 @@ body {
 /* Search Bar */
 .search-container {
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .search-input {
@@ -162,6 +162,46 @@ body {
   }
 }
 
+/* Recognition controls */
+.recognition-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.language-toggle {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.language-toggle:hover {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.recognition-label {
+  font-size: 14px;
+  color: var(--text);
+  padding: 8px 12px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  flex-grow: 1;
+}
+
 /* Suggestions Container */
 .suggestions-container {
   position: absolute;
@@ -172,25 +212,10 @@ body {
   border-radius: 0 0 16px 16px;
   border: 1px solid var(--border);
   border-top: none;
-  max-height: 40vh; /* Ограничение по высоте */
-  overflow-y: auto; /* Прокрутка */
+  max-height: 200px;
+  overflow-y: auto;
   z-index: 1000;
   display: none;
-  scrollbar-width: thin;
-}
-
-.suggestions-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.suggestions-container::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.05);
-  border-radius: 3px;
-}
-
-.suggestions-container::-webkit-scrollbar-thumb {
-  background: var(--text-secondary);
-  border-radius: 3px;
 }
 
 .suggestion-item {
@@ -198,28 +223,10 @@ body {
   cursor: pointer;
   color: var(--text);
   font-size: 16px;
-  transition: background-color 0.2s;
-}
-
-/* Чередование цветов строк */
-.suggestion-item:nth-child(odd) {
-  background-color: rgba(0,0,0,0.03);
-}
-
-.suggestion-item:nth-child(even) {
-  background-color: rgba(0,0,0,0.01);
-}
-
-.dark-theme .suggestion-item:nth-child(odd) {
-  background-color: rgba(255,255,255,0.05);
-}
-
-.dark-theme .suggestion-item:nth-child(even) {
-  background-color: rgba(255,255,255,0.03);
 }
 
 .suggestion-item:hover {
-  background-color: var(--primary-light) !important;
+  background-color: var(--primary-light);
 }
 
 /* Loader */
@@ -327,6 +334,44 @@ body {
   word-break: break-word;
 }
 
+/* Mode Selector */
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Search Hint */
+.search-hint {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  margin: 8px 0 15px;
+  min-height: 20px;
+}
+
 /* No Results */
 .no-results {
   background: var(--card-bg);
@@ -384,54 +429,6 @@ body {
   border-color: var(--primary);
 }
 
-/* Mode Selector */
-.mode-selector {
-  display: flex;
-  gap: 8px;
-  margin: 15px 0 20px;
-}
-
-.mode-btn {
-  flex: 1;
-  padding: 12px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mode-btn.active {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-/* Search Hint */
-.search-hint {
-  color: var(--text-secondary);
-  font-size: 14px;
-  text-align: center;
-  margin-top: 8px;
-  margin-bottom: 5px;
-  min-height: 20px;
-}
-
-/* Theme toggle */
-.theme-toggle i {
-  color: var(--text);
-}
-
-.dark-theme .theme-toggle i {
-  color: #FFD700;
-}
-
 /* Mobile Optimizations */
 @media (max-width: 480px) {
   .header {
@@ -450,13 +447,19 @@ body {
     font-size: 17px;
   }
   
+  .recognition-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .language-toggle, .recognition-label {
+    width: 100%;
+    text-align: center;
+  }
+  
   .mode-btn {
     padding: 10px 5px;
     font-size: 14px;
-  }
-  
-  .mode-btn i {
-    font-size: 16px;
   }
   
   .search-hint {
@@ -470,105 +473,5 @@ body {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-}
-
-/* Language toggle */
-.language-toggle {
-  position: absolute;
-  right: 60px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
-  width: 40px;
-  height: 30px;
-  border-radius: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.language-toggle:hover {
-  background-color: var(--primary-light);
-}
-
-/* iOS specific adjustments */
-@supports (-webkit-touch-callout: none) {
-  .search-input {
-    padding-right: 110px; /* Space for buttons */
-  }
-}
-
-/* Android specific adjustments */
-@supports (-webkit-overflow-scrolling: touch) and (not (-webkit-touch-callout: none)) {
-  .search-input {
-    padding-right: 100px;
-  }
-}
-
-/* Suggestion item for language */
-.suggestion i.fa-globe {
-  color: var(--primary);
-}
-
-/* Recognition controls */
-.recognition-controls {
-  display: flex;
-  align-items: center;
-  margin: 10px 0;
-  gap: 10px;
-}
-
-.language-toggle {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 8px 16px;
-  border-radius: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.language-toggle:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary);
-}
-
-.recognition-label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  background: var(--card-bg);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-
-/* Mobile optimization */
-@media (max-width: 480px) {
-  .recognition-controls {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .language-toggle {
-    width: 100%;
-    padding: 10px;
-  }
-  
-  .recognition-label {
-    width: 100%;
-    text-align: center;
   }
 }
