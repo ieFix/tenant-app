@@ -1,6 +1,7 @@
 ﻿// Configuration
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyInNQjDjuDOnzKVE0j7eZisaRr-2D55Tad2T-yakBZiDtltL-NPwuS7i4cnTv4igpQqg/exec';
 const CACHE_KEY = 'tenantData';
+const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 дней
 let tenantData = [];
 let currentMode = 'general';
 let recognition = null;
@@ -156,6 +157,12 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G',
+    'Д': 'D', 'Е': 'E', 'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
+    'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
+    'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
+    'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya',
     'ь': '', '\'': '', '`': '', '’': ''
   };
 
@@ -237,7 +244,7 @@ function updateSearchHint() {
   }
 }
 
-// Load data
+// Load data with improved caching
 function loadData() {
   loader.style.display = 'flex';
   
@@ -245,21 +252,29 @@ function loadData() {
     .then(serverLastModified => {
       const stored = localStorage.getItem(CACHE_KEY);
       const cacheData = stored ? JSON.parse(stored) : null;
+      const now = Date.now();
       
-      // Check if cache is valid
-      if (cacheData && cacheData.lastModified) {
+      // Check if cache exists and is valid
+      if (cacheData && cacheData.data && cacheData.timestamp && cacheData.lastModified) {
         const cacheTime = new Date(cacheData.lastModified).getTime();
         const serverTime = new Date(serverLastModified).getTime();
+        const isCacheExpired = now > cacheData.timestamp + CACHE_TIME;
         
-        if (serverTime <= cacheTime) {
-          tenantData = cacheData.data || [];
+        // Use cache if:
+        // 1. Server data is not newer AND
+        // 2. Cache is not expired
+        if (serverTime <= cacheTime && !isCacheExpired) {
+          tenantData = cacheData.data;
           loader.style.display = 'none';
           if (textInput.value) filterAndRender(textInput.value);
           return;
         }
       }
       
-      // Fetch new data
+      // Fetch new data if:
+      // 1. No cache OR
+      // 2. Server data is newer OR
+      // 3. Cache is expired
       fetchData(serverLastModified);
     })
     .catch(err => {
@@ -296,11 +311,13 @@ function getLastModified() {
 function fetchData(lastModified) {
   window.dataCb = resp => {
     tenantData = resp.data || [];
+    const now = Date.now();
     
-    // Save to cache
+    // Save to cache with timestamp and lastModified
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
-      lastModified: lastModified
+      lastModified: lastModified,
+      timestamp: now // Current time when saving
     }));
     
     cleanup('dataCb');
@@ -384,7 +401,7 @@ function safeIncludes(value, query) {
   return cleanValue.includes(query);
 }
 
-// Check synonyms - теперь только полное совпадение
+// Check synonyms - только полное совпадение
 function checkSynonyms(synonyms, query) {
   if (!synonyms) return false;
   
@@ -392,7 +409,6 @@ function checkSynonyms(synonyms, query) {
   
   return synonymList.some(syn => {
     const cleanSyn = syn.trim();
-    // ТОЛЬКО ПОЛНОЕ СОВПАДЕНИЕ
     return cleanSyn === query;
   });
 }
@@ -460,25 +476,49 @@ function renderCards(rows) {
   });
 }
 
-// Format phone numbers - исправленная версия
+// Format phone numbers in Irish format
 function formatPhone(phone) {
-  // Проверяем на null/undefined/пустую строку
-  if (phone == null || phone === '') return 'Unknown';
+  if (phone == null || phone === '' || phone === 'Unknown') return 'Unknown';
   
-  // Преобразуем в строку
+  // Convert to string and clean
   const phoneStr = phone.toString();
+  const cleaned = phoneStr.replace(/\D/g, ''); // Remove all non-digit characters
   
-  // Удаляем все нецифровые символы, кроме плюса в начале
-  const cleaned = phoneStr.replace(/(?!^\+)[^\d]/g, '');
-  
-  // Форматируем номер телефона
-  const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
-  
-  if (match) {
-    return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
+  // Irish mobile numbers: 08X XXXXXX or 3538X XXXXXX
+  if (cleaned.startsWith('353') && cleaned.length === 12) {
+    // International format: +353 8X XXX XXXX
+    const operator = cleaned.substring(3, 5);
+    const part1 = cleaned.substring(5, 8);
+    const part2 = cleaned.substring(8, 12);
+    return `+353 ${operator} ${part1} ${part2}`;
+  } 
+  else if (cleaned.startsWith('08') && cleaned.length === 10) {
+    // National format: (08X) XXX XXXX
+    const operator = cleaned.substring(0, 3);
+    const part1 = cleaned.substring(3, 6);
+    const part2 = cleaned.substring(6, 10);
+    return `(${operator}) ${part1} ${part2}`;
+  } 
+  else if (cleaned.length === 9 && cleaned.startsWith('8')) {
+    // Mobile without country code: 8XXXXXXX -> (08X) XXX XXXX
+    const operator = `08${cleaned.substring(1, 2)}`;
+    const part1 = cleaned.substring(2, 5);
+    const part2 = cleaned.substring(5, 9);
+    return `(${operator}) ${part1} ${part2}`;
+  } 
+  else if (cleaned.length === 10 && !cleaned.startsWith('08')) {
+    // Probably landline: (0XX) XXX XXXX
+    const areaCode = cleaned.substring(0, 3);
+    const part1 = cleaned.substring(3, 6);
+    const part2 = cleaned.substring(6, 10);
+    return `(${areaCode}) ${part1} ${part2}`;
+  }
+  else if (cleaned.length === 7) {
+    // Local number without area code: XXX XXXX
+    return `${cleaned.substring(0, 3)} ${cleaned.substring(3, 7)}`;
   }
   
-  // Возвращаем оригинал, если формат не распознан
+  // Return original if format not recognized
   return phoneStr;
 }
 
