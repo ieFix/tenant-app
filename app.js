@@ -75,7 +75,7 @@ function setupEventListeners() {
   
   // Click outside to hide suggestions
   document.addEventListener('click', (e) => {
-    if (!suggestionsContainer.contains(e.target)) {
+    if (!suggestionsContainer.contains(e.target) && !e.target.closest('.search-container')) {
       hideSuggestions();
     }
   });
@@ -195,9 +195,15 @@ function handleRecognitionError(error) {
   let message = "Sorry, I didn't catch that. Please try typing.";
   
   switch(error) {
-    case 'no-speech': message = "No speech detected. Please type instead."; break;
-    case 'audio-capture': message = "Microphone not available. Please type."; break;
-    case 'not-allowed': message = "Microphone access denied. Please allow access in settings."; break;
+    case 'no-speech': 
+      message = "No speech detected. Please type instead."; 
+      break;
+    case 'audio-capture': 
+      message = "Microphone not available. Please type."; 
+      break;
+    case 'not-allowed': 
+      message = "Microphone access denied. Please allow access in settings."; 
+      break;
   }
   
   searchHint.textContent = message;
@@ -207,8 +213,7 @@ function handleRecognitionError(error) {
 
 // Sanitize user input
 function sanitizeInput(input) {
-  // Удаляем знаки препинания и лишние пробелы
-  return input.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").substring(0, 100);
+  return input.substring(0, 100);
 }
 
 // Reset voice button
@@ -220,9 +225,15 @@ function resetVoiceButton() {
 // Update search hint based on mode
 function updateSearchHint() {
   switch(currentMode) {
-    case 'general': searchHint.textContent = "Search by any information: name, address, account, etc."; break;
-    case 'name': searchHint.textContent = "Search by name. Supports short names."; break;
-    case 'address': searchHint.textContent = "Search by Eircode or address."; break;
+    case 'general': 
+      searchHint.textContent = "Search by any information: name, address, account, etc."; 
+      break;
+    case 'name': 
+      searchHint.textContent = "Search by name. Supports short names."; 
+      break;
+    case 'address': 
+      searchHint.textContent = "Search by Eircode or address."; 
+      break;
   }
 }
 
@@ -230,28 +241,40 @@ function updateSearchHint() {
 function loadData() {
   loader.style.display = 'flex';
   
-  getLastModified().then(serverLastModified => {
-    const stored = localStorage.getItem(CACHE_KEY);
-    const cacheData = stored ? JSON.parse(stored) : null;
-    const serverTime = serverLastModified.getTime();
-    
-    // Если в кеше есть данные и дата последнего изменения в кеше не меньше серверной
-    if (cacheData && cacheData.lastModified) {
-      const cacheTime = new Date(cacheData.lastModified).getTime();
-      if (serverTime <= cacheTime) {
-        tenantData = cacheData.data;
+  getLastModified()
+    .then(serverLastModified => {
+      const stored = localStorage.getItem(CACHE_KEY);
+      const cacheData = stored ? JSON.parse(stored) : null;
+      
+      // Check if cache is valid
+      if (cacheData && cacheData.lastModified) {
+        const cacheTime = new Date(cacheData.lastModified).getTime();
+        const serverTime = new Date(serverLastModified).getTime();
+        
+        if (serverTime <= cacheTime) {
+          tenantData = cacheData.data || [];
+          loader.style.display = 'none';
+          if (textInput.value) filterAndRender(textInput.value);
+          return;
+        }
+      }
+      
+      // Fetch new data
+      fetchData(serverLastModified);
+    })
+    .catch(err => {
+      console.error('Cache check error:', err);
+      // Try to use cache anyway if available
+      const stored = localStorage.getItem(CACHE_KEY);
+      if (stored) {
+        const cacheData = JSON.parse(stored);
+        tenantData = cacheData.data || [];
         loader.style.display = 'none';
         if (textInput.value) filterAndRender(textInput.value);
-        return;
+      } else {
+        searchHint.textContent = "Failed to load data. Please refresh the page.";
       }
-    }
-    
-    // Иначе загружаем новые данные
-    fetchData(serverLastModified);
-  }).catch(err => {
-    console.error('Cache check error:', err);
-    fetchData(new Date(0));
-  });
+    });
 }
 
 // Get last modified date from server
@@ -309,10 +332,14 @@ function filterAndRender(query) {
   
   const rows = tenantData.filter(row => {
     switch(currentMode) {
-      case 'general': return checkGeneralMatch(row, cleanQuery);
-      case 'name': return checkNameMatch(row, cleanQuery);
-      case 'address': return checkAddressMatch(row, cleanQuery);
-      default: return false;
+      case 'general': 
+        return checkGeneralMatch(row, cleanQuery);
+      case 'name': 
+        return checkNameMatch(row, cleanQuery);
+      case 'address': 
+        return checkAddressMatch(row, cleanQuery);
+      default: 
+        return false;
     }
   });
   
@@ -346,7 +373,7 @@ function checkNameMatch(row, query) {
 function checkAddressMatch(row, query) {
   return (
     safeIncludes(row[5], query) || 
-    safeIncludes(row[6], query))
+    safeIncludes(row[6], query)
   );
 }
 
@@ -436,18 +463,19 @@ function renderCards(rows) {
 
 // Format phone numbers
 function formatPhone(phone) {
-  if (!phone || phone === 'Unknown') return 'Unknown';
+  if (!phone || typeof phone !== 'string') return 'Unknown';
   
-  // Удаляем все нечисловые символы, кроме плюса в начале
-  const cleaned = phone.toString().replace(/(?!^\+)\D/g, '');
+  // Remove all non-digit characters except leading +
+  const cleaned = phone.replace(/(?!^\+)\D/g, '');
   
-  // Форматируем номер телефона
+  // Format as: +XX XXX XXX XXX
   const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
+  
   if (match) {
     return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
   }
   
-  // Если формат не распознан, возвращаем оригинал
+  // Return original if format not recognized
   return phone;
 }
 
