@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbknV_Ow0uJg904gNzE_SJl4tHQ3PbiszJ4SMkokUGrOff035k8cdsKsuq106sg0JP_A/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyInNQjDjuDOnzKVE0j7eZisaRr-2D55Tad2T-yakBZiDtltL-NPwuS7i4cnTv4igpQqg/exec';
 const CACHE_KEY = 'tenantData';
 let tenantData = [];
 let currentMode = 'general';
@@ -384,7 +384,7 @@ function safeIncludes(value, query) {
   return cleanValue.includes(query);
 }
 
-// Check synonyms
+// Check synonyms - теперь только полное совпадение
 function checkSynonyms(synonyms, query) {
   if (!synonyms) return false;
   
@@ -392,9 +392,8 @@ function checkSynonyms(synonyms, query) {
   
   return synonymList.some(syn => {
     const cleanSyn = syn.trim();
-    return cleanSyn === query || 
-           cleanSyn.includes(query) || 
-           query.includes(cleanSyn);
+    // ТОЛЬКО ПОЛНОЕ СОВПАДЕНИЕ
+    return cleanSyn === query;
   });
 }
 
@@ -461,22 +460,26 @@ function renderCards(rows) {
   });
 }
 
-// Format phone numbers
+// Format phone numbers - исправленная версия
 function formatPhone(phone) {
-  if (!phone || typeof phone !== 'string') return 'Unknown';
+  // Проверяем на null/undefined/пустую строку
+  if (phone == null || phone === '') return 'Unknown';
   
-  // Remove all non-digit characters except leading +
-  const cleaned = phone.replace(/(?!^\+)\D/g, '');
+  // Преобразуем в строку
+  const phoneStr = phone.toString();
   
-  // Format as: +XX XXX XXX XXX
+  // Удаляем все нецифровые символы, кроме плюса в начале
+  const cleaned = phoneStr.replace(/(?!^\+)[^\d]/g, '');
+  
+  // Форматируем номер телефона
   const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
   
   if (match) {
     return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
   }
   
-  // Return original if format not recognized
-  return phone;
+  // Возвращаем оригинал, если формат не распознан
+  return phoneStr;
 }
 
 // Show suggestions
