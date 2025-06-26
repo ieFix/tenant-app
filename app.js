@@ -1,7 +1,6 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyInNQjDjuDOnzKVE0j7eZisaRr-2D55Tad2T-yakBZiDtltL-NPwuS7i4cnTv4igpQqg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTRWFPeErTSXQGeMItevRfACV6AeGxNui0c0N8CbzR3x4iGGBmZwVayw_npoAZCbnu1w/exec';
 const CACHE_KEY = 'tenantData';
-const CACHE_TIME = 30 * 24 * 60 * 60 * 1000; // 30 дней
 let tenantData = [];
 let currentMode = 'general';
 let recognition = null;
@@ -97,7 +96,7 @@ function handleSearchInput() {
   const safeQuery = sanitizeInput(textInput.value);
   filterAndRender(safeQuery);
   
-  // Показываем подсказки только в режимах Name и Address
+  // Show suggestions only in Name and Address modes
   if (currentMode !== 'general') {
     showSuggestions(safeQuery);
   } else {
@@ -122,12 +121,12 @@ function initVoiceRecognition() {
       const transcript = e.results[0][0].transcript.trim();
       let finalText = transcript;
       
-      // Transliterate for Ukrainian
+      // Process Ukrainian speech
       if (recognitionLanguage === 'uk-UA') {
         finalText = transliterate(transcript);
       }
       
-      // Удаляем знаки препинания и лишние пробелы
+      // Remove punctuation and extra spaces
       finalText = finalText.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ");
       
       // Sanitize and set input
@@ -148,21 +147,60 @@ function initVoiceRecognition() {
   }
 }
 
-// Transliterate Cyrillic to Latin
+// Transliterate Cyrillic to Latin with number conversion
 function transliterate(text) {
-  const cyrillicMap = {
+  // Convert numbers first
+  const numbersMap = {
+    'один': '1', 'два': '2', 'три': '3', 'чотири': '4', 
+    'п\'ять': '5', 'шість': '6', 'сім': '7', 'вісім': '8', 
+    'дев\'ять': '9', 'десять': '10', 'четыре': '4', 
+    'пять': '5', 'шесть': '6', 'семь': '7', 'восемь': '8', 'девять': '9',
+    'перший': '1', 'другий': '2', 'третій': '3'
+    'первый': '1', 'второй': '2', 'третий': '3'
+  };
+  
+  // Process whole words first (numbers)
+  let result = text.toLowerCase();
+  Object.entries(numbersMap).forEach(([word, digit]) => {
+    const regex = new RegExp('\\b' + word + '\\b', 'g');
+    result = result.replace(regex, digit);
+  });
+  
+  // Then transliterate characters
+  const charMap = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g',
     'д': 'd', 'е': 'e', 'є': 'ye', 'ж': 'zh', 'з': 'z', 'и': 'y',
     'і': 'i', 'ї': 'yi', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
-    'щ': 'shch', 'ю': 'yu', 'я': 'ya',
+    'щ': 'shch', 'ю': 'yu', 'я': 'ya', 'ы': 'y', 'э': 'e',
     'ь': '', '\'': '', '`': '', '’': ''
   };
 
-  return text.split('').map(char => 
-    cyrillicMap[char] || char
+  return result.split('').map(char => 
+    charMap[char] || char
   ).join('');
+}
+
+// Handle recognition errors
+function handleRecognitionError(error) {
+  let message = "Sorry, I didn't catch that. Please try typing.";
+  
+  switch(error) {
+    case 'no-speech': 
+      message = "No speech detected. Please type instead."; 
+      break;
+    case 'audio-capture': 
+      message = "Microphone not available. Please type."; 
+      break;
+    case 'not-allowed': 
+      message = "Microphone access denied. Please allow access in settings."; 
+      break;
+  }
+  
+  searchHint.textContent = message;
+  resetVoiceButton();
+  setTimeout(updateSearchHint, 3000);
 }
 
 // Toggle recognition language
@@ -191,27 +229,6 @@ function updateRecognitionLanguage() {
   updateSearchHint();
 }
 
-// Handle recognition errors
-function handleRecognitionError(error) {
-  let message = "Sorry, I didn't catch that. Please try typing.";
-  
-  switch(error) {
-    case 'no-speech': 
-      message = "No speech detected. Please type instead."; 
-      break;
-    case 'audio-capture': 
-      message = "Microphone not available. Please type."; 
-      break;
-    case 'not-allowed': 
-      message = "Microphone access denied. Please allow access in settings."; 
-      break;
-  }
-  
-  searchHint.textContent = message;
-  resetVoiceButton();
-  setTimeout(updateSearchHint, 3000);
-}
-
 // Sanitize user input
 function sanitizeInput(input) {
   return input.substring(0, 100);
@@ -238,70 +255,33 @@ function updateSearchHint() {
   }
 }
 
-// Load data with improved caching
+// Load data
 function loadData() {
   loader.style.display = 'flex';
   
-  getLastModified()
-    .then(serverLastModified => {
-      const stored = localStorage.getItem(CACHE_KEY);
-      const cacheData = stored ? JSON.parse(stored) : null;
-      const now = Date.now();
+  getLastModified().then(serverLastModified => {
+    const stored = localStorage.getItem(CACHE_KEY);
+    const cacheData = stored ? JSON.parse(stored) : null;
+    
+    // Check if cache is valid
+    if (cacheData && cacheData.data && cacheData.lastModified) {
+      const cacheTime = new Date(cacheData.lastModified).getTime();
+      const serverTime = serverLastModified.getTime();
       
-      // Если есть кеш и он содержит необходимые данные
-      if (cacheData && cacheData.data) {
-        // Проверяем наличие необходимых метаданных
-        const hasMetadata = cacheData.timestamp && cacheData.lastModified;
-        
-        // Если метаданных нет, добавляем их (миграция для старых кешей)
-        if (!hasMetadata) {
-          cacheData.timestamp = now;
-          cacheData.lastModified = new Date(0).toISOString(); // Ставим минимальную дату
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-        }
-        
-        // Преобразуем даты в числовой формат
-        const cacheTime = new Date(cacheData.lastModified).getTime();
-        const serverTime = serverLastModified.getTime();
-        const isCacheExpired = now > cacheData.timestamp + CACHE_TIME;
-        
-        console.log('Cache validation:',
-          `Server: ${serverTime}, Cache: ${cacheTime}, Expired: ${isCacheExpired}`);
-        
-        // Используем кеш если:
-        // 1. Данные на сервере не новее
-        // 2. Кеш не просрочен
-        if (serverTime <= cacheTime && !isCacheExpired) {
-          tenantData = cacheData.data;
-          loader.style.display = 'none';
-          if (textInput.value) filterAndRender(textInput.value);
-          return;
-        }
+      if (serverTime <= cacheTime) {
+        tenantData = cacheData.data;
+        loader.style.display = 'none';
+        if (textInput.value) filterAndRender(textInput.value);
+        return;
       }
-      
-      // Если кеш невалиден - загружаем новые данные
-      fetchData(serverLastModified);
-    })
-    .catch(err => {
-      console.error('Cache check error:', err);
-      // Пробуем использовать кеш как есть
-      const stored = localStorage.getItem(CACHE_KEY);
-      if (stored) {
-        try {
-          const cacheData = JSON.parse(stored);
-          if (cacheData.data) {
-            tenantData = cacheData.data;
-            loader.style.display = 'none';
-            if (textInput.value) filterAndRender(textInput.value);
-            return;
-          }
-        } catch (e) {
-          console.error('Error parsing cache:', e);
-        }
-      }
-      loader.style.display = 'none';
-      searchHint.textContent = "Failed to load data. Please refresh the page.";
-    });
+    }
+    
+    // Fetch new data
+    fetchData(serverLastModified);
+  }).catch(err => {
+    console.error('Cache check error:', err);
+    fetchData(new Date(0));
+  });
 }
 
 // Get last modified date from server
@@ -320,22 +300,20 @@ function getLastModified() {
 }
 
 // Fetch data from server
-function fetchData(serverLastModified) {
+function fetchData(lastModified) {
   window.dataCb = resp => {
     tenantData = resp.data || [];
-    const now = Date.now();
     
-    // Сохраняем в кеш с метаданными
+    // Save to cache
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
-      lastModified: serverLastModified.toISOString(), // ISO строка для надежности
-      timestamp: now // Текущее время сохранения
+      lastModified: lastModified
     }));
     
     cleanup('dataCb');
     loader.style.display = 'none';
     
-    // Применяем текущий поиск
+    // Apply current search
     if (textInput.value) filterAndRender(textInput.value);
   };
   
@@ -413,7 +391,7 @@ function safeIncludes(value, query) {
   return cleanValue.includes(query);
 }
 
-// Check synonyms - только полное совпадение
+// Check synonyms
 function checkSynonyms(synonyms, query) {
   if (!synonyms) return false;
   
@@ -488,57 +466,29 @@ function renderCards(rows) {
   });
 }
 
-// Format phone numbers in Irish format
+// Format phone numbers
 function formatPhone(phone) {
   if (phone == null || phone === '' || phone === 'Unknown') return 'Unknown';
   
-  // Convert to string and clean
-  const phoneStr = phone.toString();
-  const cleaned = phoneStr.replace(/\D/g, ''); // Remove all non-digit characters
+  // Remove all non-digit characters except leading +
+  const cleaned = phone.toString().replace(/(?!^\+)\D/g, '');
   
-  // Handle Irish mobile numbers
-  if (cleaned.startsWith('353') && cleaned.length === 12) {
-    // International format: +353 8X XXX XXXX
-    const operator = cleaned.substring(3, 5);
-    const part1 = cleaned.substring(5, 8);
-    const part2 = cleaned.substring(8, 12);
-    return `+353 ${operator} ${part1} ${part2}`;
-  } 
-  else if (cleaned.startsWith('08') && cleaned.length === 10) {
-    // National format: (08X) XXX XXXX
-    const operator = cleaned.substring(0, 3);
-    const part1 = cleaned.substring(3, 6);
-    const part2 = cleaned.substring(6, 10);
-    return `(${operator}) ${part1} ${part2}`;
-  } 
-  else if (cleaned.length === 9 && cleaned.startsWith('8')) {
-    // Mobile without country code: 8XXXXXXX -> (08X) XXX XXXX
-    const operator = `08${cleaned.substring(1, 2)}`;
-    const part1 = cleaned.substring(2, 5);
-    const part2 = cleaned.substring(5, 9);
-    return `(${operator}) ${part1} ${part2}`;
-  } 
-  else if (cleaned.length === 10 && !cleaned.startsWith('08')) {
-    // Probably landline: (0XX) XXX XXXX
-    const areaCode = cleaned.substring(0, 3);
-    const part1 = cleaned.substring(3, 6);
-    const part2 = cleaned.substring(6, 10);
-    return `(${areaCode}) ${part1} ${part2}`;
-  }
-  else if (cleaned.length === 7) {
-    // Local number without area code: XXX XXXX
-    return `${cleaned.substring(0, 3)} ${cleaned.substring(3, 7)}`;
+  // Format as: +XX XXX XXX XXX
+  const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
+  
+  if (match) {
+    return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
   }
   
   // Return original if format not recognized
-  return phoneStr;
+  return phone;
 }
 
 // Show suggestions
 function showSuggestions(query) {
   suggestionsContainer.innerHTML = '';
   
-  // Не показываем подсказки в общем режиме
+  // Don't show suggestions in general mode
   if (currentMode === 'general') {
     hideSuggestions();
     return;
@@ -621,7 +571,7 @@ function setSearchMode(mode) {
   
   updateSearchHint();
   
-  // Обновляем подсказки при смене режима
+  // Update suggestions when mode changes
   const safeQuery = sanitizeInput(textInput.value);
   if (safeQuery) {
     filterAndRender(safeQuery);
