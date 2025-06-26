@@ -157,12 +157,6 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya',
-    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G',
-    'Д': 'D', 'Е': 'E', 'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
-    'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
-    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
-    'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
-    'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya',
     'ь': '', '\'': '', '`': '', '’': ''
   };
 
@@ -254,15 +248,29 @@ function loadData() {
       const cacheData = stored ? JSON.parse(stored) : null;
       const now = Date.now();
       
-      // Check if cache exists and is valid
-      if (cacheData && cacheData.data && cacheData.timestamp && cacheData.lastModified) {
+      // Если есть кеш и он содержит необходимые данные
+      if (cacheData && cacheData.data) {
+        // Проверяем наличие необходимых метаданных
+        const hasMetadata = cacheData.timestamp && cacheData.lastModified;
+        
+        // Если метаданных нет, добавляем их (миграция для старых кешей)
+        if (!hasMetadata) {
+          cacheData.timestamp = now;
+          cacheData.lastModified = new Date(0).toISOString(); // Ставим минимальную дату
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        }
+        
+        // Преобразуем даты в числовой формат
         const cacheTime = new Date(cacheData.lastModified).getTime();
-        const serverTime = new Date(serverLastModified).getTime();
+        const serverTime = serverLastModified.getTime();
         const isCacheExpired = now > cacheData.timestamp + CACHE_TIME;
         
-        // Use cache if:
-        // 1. Server data is not newer AND
-        // 2. Cache is not expired
+        console.log('Cache validation:',
+          `Server: ${serverTime}, Cache: ${cacheTime}, Expired: ${isCacheExpired}`);
+        
+        // Используем кеш если:
+        // 1. Данные на сервере не новее
+        // 2. Кеш не просрочен
         if (serverTime <= cacheTime && !isCacheExpired) {
           tenantData = cacheData.data;
           loader.style.display = 'none';
@@ -271,24 +279,28 @@ function loadData() {
         }
       }
       
-      // Fetch new data if:
-      // 1. No cache OR
-      // 2. Server data is newer OR
-      // 3. Cache is expired
+      // Если кеш невалиден - загружаем новые данные
       fetchData(serverLastModified);
     })
     .catch(err => {
       console.error('Cache check error:', err);
-      // Try to use cache anyway if available
+      // Пробуем использовать кеш как есть
       const stored = localStorage.getItem(CACHE_KEY);
       if (stored) {
-        const cacheData = JSON.parse(stored);
-        tenantData = cacheData.data || [];
-        loader.style.display = 'none';
-        if (textInput.value) filterAndRender(textInput.value);
-      } else {
-        searchHint.textContent = "Failed to load data. Please refresh the page.";
+        try {
+          const cacheData = JSON.parse(stored);
+          if (cacheData.data) {
+            tenantData = cacheData.data;
+            loader.style.display = 'none';
+            if (textInput.value) filterAndRender(textInput.value);
+            return;
+          }
+        } catch (e) {
+          console.error('Error parsing cache:', e);
+        }
       }
+      loader.style.display = 'none';
+      searchHint.textContent = "Failed to load data. Please refresh the page.";
     });
 }
 
@@ -308,22 +320,22 @@ function getLastModified() {
 }
 
 // Fetch data from server
-function fetchData(lastModified) {
+function fetchData(serverLastModified) {
   window.dataCb = resp => {
     tenantData = resp.data || [];
     const now = Date.now();
     
-    // Save to cache with timestamp and lastModified
+    // Сохраняем в кеш с метаданными
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
-      lastModified: lastModified,
-      timestamp: now // Current time when saving
+      lastModified: serverLastModified.toISOString(), // ISO строка для надежности
+      timestamp: now // Текущее время сохранения
     }));
     
     cleanup('dataCb');
     loader.style.display = 'none';
     
-    // Apply current search
+    // Применяем текущий поиск
     if (textInput.value) filterAndRender(textInput.value);
   };
   
@@ -484,7 +496,7 @@ function formatPhone(phone) {
   const phoneStr = phone.toString();
   const cleaned = phoneStr.replace(/\D/g, ''); // Remove all non-digit characters
   
-  // Irish mobile numbers: 08X XXXXXX or 3538X XXXXXX
+  // Handle Irish mobile numbers
   if (cleaned.startsWith('353') && cleaned.length === 12) {
     // International format: +353 8X XXX XXXX
     const operator = cleaned.substring(3, 5);
