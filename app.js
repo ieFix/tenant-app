@@ -174,7 +174,7 @@ function transliterate(text) {
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
     'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
     'щ': 'shch', 'ю': 'yu', 'я': 'ya', 'ы': 'y', 'э': 'e',
-    'ь': '', '\'': '', '`': '', '’': ''
+    'ь': '', '\'': '', '`': '', '’': '', 'ъ': ''
   };
 
   return result.split('').map(char => 
@@ -264,17 +264,19 @@ function loadData() {
     const cacheData = stored ? JSON.parse(stored) : null;
     
     // Check if cache is valid
-    if (cacheData && cacheData.data && cacheData.lastModified) {
-      const cacheTime = new Date(cacheData.lastModified).getTime();
-      const serverTime = serverLastModified.getTime();
-      
-      if (serverTime <= cacheTime) {
-        tenantData = cacheData.data;
-        loader.style.display = 'none';
-        if (textInput.value) filterAndRender(textInput.value);
-        return;
-      }
-    }
+if (cacheData && cacheData.data && cacheData.lastModified) {
+  const cacheTime = new Date(cacheData.lastModified).getTime();
+  const serverTime = serverLastModified.getTime();
+  
+  // Добавляем запас 5 секунд для сетевых задержек
+  if (serverTime <= cacheTime + 5000) {
+    tenantData = cacheData.data;
+    initCleanData(); // Инициализация очищенных данных
+    loader.style.display = 'none';
+    if (textInput.value) filterAndRender(textInput.value);
+    return;
+  }
+}
     
     // Fetch new data
     fetchData(serverLastModified);
@@ -328,7 +330,8 @@ function fetchData(lastModified) {
 
 // Filter and render results
 function filterAndRender(query) {
-  const cleanQuery = query.toLowerCase().trim();
+  // const cleanQuery = query.toLowerCase().trim();
+  const cleanQuery = cleanString(query);
   
   if (!cleanQuery) {
     cardsContainer.innerHTML = '';
@@ -468,40 +471,32 @@ function renderCards(rows) {
 
 // Format phone numbers
 function formatPhone(phone) {
-  if (phone == null || phone === '' || phone === 'Unknown') return 'Unknown';
+  if (!phone || phone === 'Unknown') return 'Unknown';
   
-  // Remove all non-digit characters except leading +
-  const cleaned = phone.toString().replace(/(?!^\+)\D/g, '');
-  
-  // Format as: +XX XXX XXX XXX
-  const match = cleaned.match(/^(\+\d{2})(\d{3})(\d{3})(\d{3})$/);
-  
-  if (match) {
-    return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
+  const digits = phone.toString().replace(/\D/g, '');
+  if (digits.length === 0) return 'Unknown';
+
+  // Форматирование ирландских номеров
+  if (digits.startsWith('353') && digits.length === 11) {
+    return `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
   }
   
-  // Return original if format not recognized
-  return phone;
+  // Универсальное форматирование
+  return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
 }
 
 // Show suggestions
 function showSuggestions(query) {
   suggestionsContainer.innerHTML = '';
-  
-  // Don't show suggestions in general mode
-  if (currentMode === 'general') {
+
+  if (currentMode === 'general' || query.length < 2) {
     hideSuggestions();
     return;
   }
-  
-  if (query.length < 2) {
-    hideSuggestions();
-    return;
-  }
-  
+
   let suggestions = [];
-  
-  switch(currentMode) {
+
+  switch (currentMode) {
     case 'name':
       suggestions = tenantData.map(row => row[1]).filter(Boolean); // names
       break;
@@ -512,13 +507,12 @@ function showSuggestions(query) {
       ].filter(Boolean);
       break;
   }
-  
-  // Filter and deduplicate
+
   const uniqueSuggestions = [...new Set(suggestions)];
-  const matches = uniqueSuggestions.filter(s => 
-    s.toLowerCase().includes(query.toLowerCase())
+  const matches = uniqueSuggestions.filter(s =>
+    cleanString(s).includes(cleanString(query))
   ).slice(0, 5);
-  
+
   if (matches.length > 0) {
     matches.forEach(text => {
       const div = document.createElement('div');
@@ -536,6 +530,7 @@ function showSuggestions(query) {
     hideSuggestions();
   }
 }
+
 
 // Hide suggestions
 function hideSuggestions() {
@@ -586,4 +581,19 @@ function cleanup(cb) {
   const el = document.querySelector(`script[src*="${cb}"]`);
   if (el) el.remove();
   delete window[cb];
+}
+
+// Функция для очистки строк
+function cleanString(str) {
+  return str.toString().toLowerCase()
+    .replace(/[^\w\s]|_/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Инициализация очищенных данных
+function initCleanData() {
+  cleanTenantData = tenantData.map(row => row.map(cell => 
+    cell ? cleanString(cell) : ''
+  ));
 }
