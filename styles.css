@@ -467,3 +467,51 @@ body {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
+
+@media (max-width: 350px) {
+  .search-input {
+    padding: 12px 20px 12px 45px;
+    font-size: 14px;
+  }
+  .search-icon {
+    left: 15px;
+  }
+  .language-toggle {
+    right: 50px;
+    width: 35px;
+  }
+  .voice-search {
+    right: 12px;
+  }
+  .tenant-name {
+    font-size: 16px;
+  }
+}
+
+/* Улучшение видимости микрофона в темной теме */
+.dark-theme .voice-search.listening {
+  animation: pulse-dark 1.5s infinite;
+  background-color: var(--success);
+  color: white;
+}
+
+@keyframes pulse-dark {
+  0% { 
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(172, 255, 172, 0.7); 
+  }
+  70% { 
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 0 0 10px rgba(172, 255, 172, 0); 
+  }
+  100% { 
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(172, 255, 172, 0); 
+  }
+}
+
+/* Иконка солнца в темной теме */
+.dark-theme .theme-toggle i {
+  color: #FFD700 !important; /* Ярко-желтый */
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}

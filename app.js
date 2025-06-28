@@ -2,6 +2,7 @@
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTRWFPeErTSXQGeMItevRfACV6AeGxNui0c0N8CbzR3x4iGGBmZwVayw_npoAZCbnu1w/exec';
 const CACHE_KEY = 'tenantData';
 let tenantData = [];
+let cleanTenantData = []; // Нормализованные данные для поиска
 let currentMode = 'general';
 let recognition = null;
 let recognitionLanguage = 'en-US';
@@ -255,6 +256,15 @@ function updateSearchHint() {
   }
 }
 
+// Clean string for searching
+function cleanString(str) {
+  if (!str) return '';
+  return str.toString().toLowerCase()
+    .replace(/[^\w\s]|_/g, '') // Удаляем пунктуацию
+    .replace(/\s+/g, ' ')       // Заменяем множественные пробелы
+    .trim();
+}
+
 // Load data
 function loadData() {
   loader.style.display = 'flex';
@@ -264,19 +274,19 @@ function loadData() {
     const cacheData = stored ? JSON.parse(stored) : null;
     
     // Check if cache is valid
-if (cacheData && cacheData.data && cacheData.lastModified) {
-  const cacheTime = new Date(cacheData.lastModified).getTime();
-  const serverTime = serverLastModified.getTime();
-  
-  // Добавляем запас 5 секунд для сетевых задержек
-  if (serverTime <= cacheTime + 5000) {
-    tenantData = cacheData.data;
-    initCleanData(); // Инициализация очищенных данных
-    loader.style.display = 'none';
-    if (textInput.value) filterAndRender(textInput.value);
-    return;
-  }
-}
+    if (cacheData && cacheData.data && cacheData.lastModified) {
+      const cacheTime = new Date(cacheData.lastModified).getTime();
+      const serverTime = serverLastModified.getTime();
+      
+      // Добавляем буфер 5 секунд для сетевых задержек
+      if (serverTime <= cacheTime + 5000) {
+        tenantData = cacheData.data;
+        initCleanData(); // Инициализируем очищенные данные
+        loader.style.display = 'none';
+        if (textInput.value) filterAndRender(textInput.value);
+        return;
+      }
+    }
     
     // Fetch new data
     fetchData(serverLastModified);
@@ -284,6 +294,13 @@ if (cacheData && cacheData.data && cacheData.lastModified) {
     console.error('Cache check error:', err);
     fetchData(new Date(0));
   });
+}
+
+// Initialize clean data for searching
+function initCleanData() {
+  cleanTenantData = tenantData.map(row => 
+    row.map(cell => cell ? cleanString(cell) : '')
+  );
 }
 
 // Get last modified date from server
@@ -305,6 +322,7 @@ function getLastModified() {
 function fetchData(lastModified) {
   window.dataCb = resp => {
     tenantData = resp.data || [];
+    initCleanData(); // Инициализируем очищенные данные
     
     // Save to cache
     localStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -330,7 +348,6 @@ function fetchData(lastModified) {
 
 // Filter and render results
 function filterAndRender(query) {
-  // const cleanQuery = query.toLowerCase().trim();
   const cleanQuery = cleanString(query);
   
   if (!cleanQuery) {
@@ -340,14 +357,16 @@ function filterAndRender(query) {
     return;
   }
   
-  const rows = tenantData.filter(row => {
+  const rows = tenantData.filter((row, index) => {
+    const cleanRow = cleanTenantData[index];
+    
     switch(currentMode) {
       case 'general': 
-        return checkGeneralMatch(row, cleanQuery);
+        return checkGeneralMatch(row, cleanRow, cleanQuery);
       case 'name': 
-        return checkNameMatch(row, cleanQuery);
+        return checkNameMatch(row, cleanRow, cleanQuery);
       case 'address': 
-        return checkAddressMatch(row, cleanQuery);
+        return checkAddressMatch(row, cleanRow, cleanQuery);
       default: 
         return false;
     }
@@ -357,52 +376,46 @@ function filterAndRender(query) {
 }
 
 // Check match in general mode
-function checkGeneralMatch(row, query) {
+function checkGeneralMatch(row, cleanRow, query) {
   return (
-    safeIncludes(row[1], query) || // FullName
-    safeIncludes(row[2], query) || // PPSN
-    safeIncludes(row[3], query) || // Country
-    safeIncludes(row[4], query) || // City
-    safeIncludes(row[5], query) || // Address
-    safeIncludes(row[6], query) || // Eircode
-    safeIncludes(row[7], query) || // Phone
-    safeIncludes(row[8], query) || // ElectricityAccount
+    cleanRow[1].includes(query) || // FullName
+    cleanRow[2].includes(query) || // PPSN
+    cleanRow[3].includes(query) || // Country
+    cleanRow[4].includes(query) || // City
+    cleanRow[5].includes(query) || // Address
+    cleanRow[6].includes(query) || // Eircode
+    cleanRow[7].includes(query) || // Phone
+    cleanRow[8].includes(query) || // ElectricityAccount
     (row[10] && checkSynonyms(row[10], query)) // Synonyms
   );
 }
 
 // Check match in name mode
-function checkNameMatch(row, query) {
+function checkNameMatch(row, cleanRow, query) {
   return (
-    safeIncludes(row[1], query) || 
+    cleanRow[1].includes(query) || 
     (row[10] && checkSynonyms(row[10], query))
   );
 }
 
 // Check match in address mode
-function checkAddressMatch(row, query) {
+function checkAddressMatch(row, cleanRow, query) {
   return (
-    safeIncludes(row[5], query) || 
-    safeIncludes(row[6], query)
+    cleanRow[5].includes(query) || 
+    cleanRow[6].includes(query)
   );
-}
-
-// Safe includes check
-function safeIncludes(value, query) {
-  if (!value) return false;
-  const cleanValue = value.toString().toLowerCase().replace(/[^\w\s]|_/g, "");
-  return cleanValue.includes(query);
 }
 
 // Check synonyms
 function checkSynonyms(synonyms, query) {
   if (!synonyms) return false;
   
-  const synonymList = synonyms.toString().toLowerCase().replace(/[^\w\s]|_/g, "").split(',');
+  const cleanSyns = cleanString(synonyms);
+  const synonymList = cleanSyns.split(',');
   
   return synonymList.some(syn => {
     const cleanSyn = syn.trim();
-    return cleanSyn === query;
+    return cleanSyn.includes(query) || query.includes(cleanSyn);
   });
 }
 
@@ -473,30 +486,43 @@ function renderCards(rows) {
 function formatPhone(phone) {
   if (!phone || phone === 'Unknown') return 'Unknown';
   
+  // Remove all non-digit characters
   const digits = phone.toString().replace(/\D/g, '');
-  if (digits.length === 0) return 'Unknown';
-
-  // Форматирование ирландских номеров
+  
+  // Format Irish numbers: +353 XX XXX XXXX
   if (digits.startsWith('353') && digits.length === 11) {
-    return `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+    const rest = digits.slice(3);
+    return `+353 ${rest.slice(0, 2)} ${rest.slice(2, 5)} ${rest.slice(5)}`;
   }
   
-  // Универсальное форматирование
-  return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  // Format other numbers: XXX-XXX-XXXX
+  if (digits.length === 10) {
+    return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  
+  // Return original if format not recognized
+  return phone;
 }
 
 // Show suggestions
 function showSuggestions(query) {
   suggestionsContainer.innerHTML = '';
-
-  if (currentMode === 'general' || query.length < 2) {
+  
+  // Don't show suggestions in general mode
+  if (currentMode === 'general') {
     hideSuggestions();
     return;
   }
-
+  
+  if (query.length < 2) {
+    hideSuggestions();
+    return;
+  }
+  
+  const cleanQuery = cleanString(query);
   let suggestions = [];
-
-  switch (currentMode) {
+  
+  switch(currentMode) {
     case 'name':
       suggestions = tenantData.map(row => row[1]).filter(Boolean); // names
       break;
@@ -507,12 +533,13 @@ function showSuggestions(query) {
       ].filter(Boolean);
       break;
   }
-
+  
+  // Filter and deduplicate
   const uniqueSuggestions = [...new Set(suggestions)];
-  const matches = uniqueSuggestions.filter(s =>
-    cleanString(s).includes(cleanString(query))
+  const matches = uniqueSuggestions.filter(s => 
+    cleanString(s).includes(cleanQuery)
   ).slice(0, 5);
-
+  
   if (matches.length > 0) {
     matches.forEach(text => {
       const div = document.createElement('div');
@@ -530,7 +557,6 @@ function showSuggestions(query) {
     hideSuggestions();
   }
 }
-
 
 // Hide suggestions
 function hideSuggestions() {
@@ -581,19 +607,4 @@ function cleanup(cb) {
   const el = document.querySelector(`script[src*="${cb}"]`);
   if (el) el.remove();
   delete window[cb];
-}
-
-// Функция для очистки строк
-function cleanString(str) {
-  return str.toString().toLowerCase()
-    .replace(/[^\w\s]|_/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Инициализация очищенных данных
-function initCleanData() {
-  cleanTenantData = tenantData.map(row => row.map(cell => 
-    cell ? cleanString(cell) : ''
-  ));
 }
