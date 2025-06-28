@@ -512,6 +512,6 @@ body {
 
 /* Иконка солнца в темной теме */
 .dark-theme .theme-toggle i {
-  color: #FFD700 !important; /* Ярко-желтый */
+  color: #FFE35B !important; /* Светло-желтый */
   text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
