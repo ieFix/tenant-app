@@ -441,15 +441,10 @@ function formatPhone(phone) {
   }
   
   // Format Irish national numbers: 083 XXX XXXX
-  if (digits.length === 9 && (digits.startsWith('08') || digits.startsWith('83')) {
+  if (digits.length === 9 && (digits.startsWith('08') || digits.startsWith('83'))) {
     // Handle numbers with or without leading zero
     const cleanDigits = digits.startsWith('0') ? digits : `0${digits}`;
     return `${cleanDigits.substring(0, 3)} ${cleanDigits.substring(3, 6)} ${cleanDigits.substring(6)}`;
-  }
-  
-  // Format Irish national numbers: 083 XXX XXXX (alternative format)
-  if (digits.length === 9 && digits.startsWith('83')) {
-    return `0${digits.substring(0, 2)} ${digits.substring(2, 5)} ${digits.substring(5)}`;
   }
   
   // Default formatting for other numbers
