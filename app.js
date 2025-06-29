@@ -447,6 +447,11 @@ function formatPhone(phone) {
     return `${cleanDigits.substring(0, 3)} ${cleanDigits.substring(3, 6)} ${cleanDigits.substring(6)}`;
   }
   
+  // Format Irish national numbers: 083 XXX XXXX (alternative format)
+  if (digits.length === 9 && digits.startsWith('83')) {
+    return `0${digits.substring(0, 2)} ${digits.substring(2, 5)} ${digits.substring(5)}`;
+  }
+  
   // Default formatting for other numbers
   return phone;
 }

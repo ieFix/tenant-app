@@ -491,24 +491,27 @@ body {
 /* Улучшение видимости микрофона в темной теме */
 .dark-theme .voice-search.listening {
   animation: pulse-dark 1.5s infinite;
-  background-color: #34a853; /* Яркий зеленый */
+  background-color: #34a853;
   box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7);
 }
 
 @keyframes pulse-dark {
   0% { 
+    transform: translateY(-50%) scale(1);
     box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7);
   }
   70% { 
+    transform: translateY(-50%) scale(1.05);
     box-shadow: 0 0 0 12px rgba(52, 168, 83, 0);
   }
   100% { 
+    transform: translateY(-50%) scale(1);
     box-shadow: 0 0 0 0 rgba(52, 168, 83, 0);
   }
 }
 
 /* Иконка солнца в темной теме */
 .dark-theme .theme-toggle i {
-  color: #FFE35B !important; /* Ярко-желтый */
+  color: #FFF0AA !important; /* Светло-желтый */
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
