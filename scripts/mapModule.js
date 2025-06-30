@@ -40,12 +40,13 @@ function displayGeoResults(results) {
   resultsContainer.innerHTML = '';
   
   if (results.length === 0) {
-    resultsContainer.innerHTML = '<li>No Eircodes found within 250m</li>';
+    resultsContainer.innerHTML = '<li class="no-geo-results">No tenants found within 250m</li>';
     return;
   }
   
   results.forEach(result => {
     const li = document.createElement('li');
+    li.className = 'geo-result-item';
     li.innerHTML = `
       <span class="geo-result-code">${result.eircode}</span>
       <span class="geo-result-address">${result.address}</span>
@@ -72,7 +73,7 @@ function openMapModal() {
   if (!map) {
     setTimeout(() => {
       initMap();
-      map.invalidateSize(); // Важно для корректного отображения
+      map.invalidateSize();
     }, 100);
   }
 }
@@ -85,4 +86,11 @@ function closeMapModal() {
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.close-btn').addEventListener('click', closeMapModal);
   document.getElementById('mapSearchButton').addEventListener('click', openMapModal);
+  
+  // Закрытие модального окна при клике вне его
+  document.getElementById('mapModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('mapModal')) {
+      closeMapModal();
+    }
+  });
 });
