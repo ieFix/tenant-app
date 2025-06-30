@@ -6,7 +6,7 @@ let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.943675, -8.950022], 13);
+  map = L.map('map').setView([53.3498, -6.2603], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -18,7 +18,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250 m</p>
+    <p>Tap anywhere on the map to find tenants within 250m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -101,14 +101,8 @@ async function searchNearbyEircodes(lat, lng) {
 
     const data = JSON.parse(match[1]);
     
-    // Преобразуем расстояние в метры и округляем
-    return (data.results || []).map(result => {
-      return {
-        ...result,
-        // Преобразуем километры в метры и округляем
-        distance: Math.round(result.distance * 1000)
-      };
-    });
+    // Просто возвращаем результаты без преобразования
+    return data.results || [];
   } catch (error) {
     console.error('Geo search error:', error);
     return [];
@@ -130,12 +124,11 @@ function addResultMarkers(results, centerLat, centerLng) {
       })
     });
     
-    // Всплывающая подсказка с расстоянием в метрах
+    // Упрощенная всплывающая подсказка без расстояния
     marker.bindPopup(`
       <div class="map-popup">
         <strong>${result.eircode}</strong><br>
-        ${result.address}<br>
-        <small>${result.distance} m away</small>
+        ${result.address}
       </div>
     `);
     
@@ -172,11 +165,15 @@ function displayGeoResults(results) {
     results.forEach(result => {
       const li = document.createElement('div');
       li.className = 'geo-result-item';
+      
+      // Конвертируем километры в метры для отображения
+      const distanceInMeters = Math.round((result.distance || 0) * 1000);
+      
       li.innerHTML = `
         <span class="geo-result-code">${result.eircode}</span>
         <div class="geo-result-address">${result.address}</div>
         <div class="geo-result-distance">
-          <i class="fas fa-route"></i> ${result.distance} m away
+          <i class="fas fa-route"></i> ${distanceInMeters} m away
         </div>
       `;
       
