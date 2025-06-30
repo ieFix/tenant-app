@@ -26,8 +26,16 @@ function initMap() {
 
 async function searchNearbyEircodes(lat, lng) {
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=geo&lat=${lat}&lng=${lng}`);
-    const data = await response.json();
+    const url = `${SCRIPT_URL}?action=geo&lat=${lat}&lng=${lng}&callback=cb`;
+    const response = await fetch(url);
+    const text = await response.text();
+
+    const match = text.match(/^cb\((.*)\);?$/s);
+    if (!match) {
+      throw new Error('Не удалось разобрать JSONP-ответ:\n' + text.slice(0, 300));
+    }
+
+    const data = JSON.parse(match[1]);
     return data.results || [];
   } catch (error) {
     console.error('Geo search error:', error);
