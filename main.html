@@ -6,28 +6,96 @@
   <title>Tenant Info</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?ver=1.5">
+  <link rel="stylesheet" href="styles.css?ver=1.10">
 </head>
 <body>
   <div class="container">
-    <!-- Существующий интерфейс -->
+    <header class="header">
+      <h1 class="app-title">
+        <i class="fas fa-users"></i> Tenant Info
+      </h1>
+      <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+      </button>
+    </header>
     
-    <!-- Кнопка поиска по карте -->
-    <div class="map-search-container">
-      <button class="map-search-btn" id="mapSearchButton">
-        <i class="fas fa-map-marked-alt"></i> Map Search
+    <div class="search-container">
+      <i class="fas fa-search search-icon"></i>
+      <input 
+        type="text" 
+        class="search-input" 
+        id="textInput"
+        placeholder="Search by name, address, account..."
+        autocomplete="off"
+        enterkeyhint="search"
+        maxlength="100"
+      >
+      <button class="language-toggle" id="languageButton" title="Switch language">EN</button>
+      <button class="voice-search" id="voiceButton">
+        <i class="fas fa-microphone"></i>
+      </button>
+      <div id="suggestionsContainer" class="suggestions-container"></div>
+    </div>
+    
+    <div class="recognition-label" id="recognitionLabel">Voice search: English names</div>
+    
+    <div class="search-hint" id="searchHint">
+      Search by any information: name, address, account, etc.
+    </div>
+    
+    <div class="mode-selector">
+      <button class="mode-btn active" data-mode="general">
+        <i class="fas fa-search"></i> All
+      </button>
+      <button class="mode-btn" data-mode="name">
+        <i class="fas fa-user"></i> Name
+      </button>
+      <button class="mode-btn" data-mode="address">
+        <i class="fas fa-home"></i> Address
+      </button>
+      <button class="mode-btn" id="mapSearchButton" title="Search by location">
+        <i class="fas fa-map-marker-alt"></i> Map
       </button>
     </div>
     
-    <!-- Остальной интерфейс без изменений -->
+    <div class="loader-container" id="loader">
+      <div class="loader"></div>
+    </div>
+    
+    <div class="cards-container" id="cardsContainer">
+      <!-- Cards will be added here -->
+    </div>
+    
+    <div class="no-results" id="noResults">
+      <div class="no-results-icon">
+        <i class="fas fa-search"></i>
+      </div>
+      <h3 class="no-results-title">No results found</h3>
+      <p class="no-results-text">Try:</p>
+      
+      <div class="suggestions">
+        <div class="suggestion">
+          <i class="fas fa-undo"></i> Check spelling
+        </div>
+        <div class="suggestion">
+          <i class="fas fa-keyboard"></i> Type manually
+        </div>
+        <div class="suggestion">
+          <i class="fas fa-sync"></i> Change search mode
+        </div>
+        <div class="suggestion">
+          <i class="fas fa-globe"></i> Switch recognition language
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Модальное окно карты -->
+  <!-- Map Search Modal -->
   <div id="mapModal" class="modal">
     <div class="modal-content">
       <span class="close-btn">&times;</span>
-      <h3 class="modal-title">Search on Map</h3>
-      <div class="modal-subtitle">Click any location to find nearby Eircodes</div>
+      <h3 class="modal-title">Search Tenants by Location</h3>
+      <div class="modal-subtitle">Click on the map to find tenants within 250m</div>
       <div id="map"></div>
       <div class="results-container">
         <h4>Found within 250m:</h4>
@@ -36,13 +104,14 @@
     </div>
   </div>
 
-  <!-- Обновлённые скрипты -->
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="scripts/phoneFormatter.js?ver=1.0"></script>
   <script src="scripts/translit.js?ver=1.0"></script>
   <script src="scripts/caching.js?ver=1.0"></script>
   <script src="scripts/search.js?ver=1.0"></script>
   <script src="scripts/render.js?ver=1.0"></script>
+  <script src="scripts/app.js?ver=1.12"></script>
   <script src="scripts/mapModule.js?ver=1.0"></script>
-  <script src="scripts/app.js?ver=1.0"></script>
 </body>
 </html>
