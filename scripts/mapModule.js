@@ -6,7 +6,7 @@ let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.3498, -6.2603], 13);
+  map = L.map('map').setView([53.943675, -8.950022], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -18,7 +18,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250m</p>
+    <p>Tap anywhere on the map to find tenants within 250 m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -157,7 +157,7 @@ function displayGeoResults(results) {
     geoResults.innerHTML = `
       <div class="no-geo-results">
         <i class="fas fa-search"></i>
-        <p>No tenants found within 250m. Try another location.</p>
+        <p>No tenants found within 250 m. Try another location.</p>
       </div>
     `;
   } else {
