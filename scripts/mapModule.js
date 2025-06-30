@@ -76,16 +76,13 @@ function showMapPreloader(show) {
 
 function showErrorState() {
   const geoResults = document.getElementById('geoResults');
-  const resultsSection = document.querySelector('.results-section');
-  
   geoResults.innerHTML = `
     <div class="no-geo-results">
       <i class="fas fa-exclamation-triangle"></i>
       <p>Failed to load results. Please try again.</p>
     </div>
   `;
-  
-  resultsSection.classList.add('visible');
+  document.querySelector('.results-section').classList.add('visible');
 }
 
 async function searchNearbyEircodes(lat, lng) {
@@ -96,13 +93,19 @@ async function searchNearbyEircodes(lat, lng) {
 
     const match = text.match(/^cb\((.*)\);?$/s);
     if (!match) {
-      throw new Error('Не удалось разобрать JSONP-ответ:\n' + text.slice(0, 300));
+      throw new Error('Failed to parse JSONP response:\n' + text.slice(0, 300));
     }
 
     const data = JSON.parse(match[1]);
     
-    // Просто возвращаем результаты без преобразования
-    return data.results || [];
+    // Преобразуем расстояние в метры и округляем
+    return (data.results || []).map(result => {
+      return {
+        ...result,
+        // Преобразуем километры в метры и округляем
+        distance: Math.round(result.distance * 1000)
+      };
+    });
   } catch (error) {
     console.error('Geo search error:', error);
     return [];
@@ -124,11 +127,12 @@ function addResultMarkers(results, centerLat, centerLng) {
       })
     });
     
-    // Упрощенная всплывающая подсказка без расстояния
+    // Всплывающая подсказка с расстоянием в метрах
     marker.bindPopup(`
       <div class="map-popup">
         <strong>${result.eircode}</strong><br>
-        ${result.address}
+        ${result.address}<br>
+        <small>${result.distance} m away</small>
       </div>
     `);
     
@@ -165,15 +169,11 @@ function displayGeoResults(results) {
     results.forEach(result => {
       const li = document.createElement('div');
       li.className = 'geo-result-item';
-      
-      // Конвертируем километры в метры для отображения
-      const distanceInMeters = Math.round((result.distance || 0) * 1000);
-      
       li.innerHTML = `
         <span class="geo-result-code">${result.eircode}</span>
         <div class="geo-result-address">${result.address}</div>
         <div class="geo-result-distance">
-          <i class="fas fa-route"></i> ${distanceInMeters} m away
+          <i class="fas fa-route"></i> ${result.distance} m away
         </div>
       `;
       
