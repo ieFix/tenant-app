@@ -1,12 +1,11 @@
 ﻿// scripts/mapModule.js
 let map;
 let clickMarker;
-let resultMarkers = [];
 let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.943675, -8.950022], 13);
+  map = L.map('map').setView([53.3498, -6.2603], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -18,7 +17,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250 m</p>
+    <p>Tap anywhere on the map to find tenants within 250m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -48,9 +47,15 @@ function initMap() {
     // Поиск
     try {
       const results = await searchNearbyEircodes(lat, lng);
-      displayGeoResults(results);
-      addResultMarkers(results, lat, lng);
+      // Убедимся, что результаты есть перед отображением
+      if (results && results.length > 0) {
+        displayGeoResults(results);
+        addResultMarkers(results);
+      } else {
+        displayNoResults();
+      }
     } catch (error) {
+      console.error('Search error:', error);
       showErrorState();
     } finally {
       showMapPreloader(false);
@@ -76,13 +81,30 @@ function showMapPreloader(show) {
 
 function showErrorState() {
   const geoResults = document.getElementById('geoResults');
+  const resultsSection = document.querySelector('.results-section');
+  
   geoResults.innerHTML = `
     <div class="no-geo-results">
       <i class="fas fa-exclamation-triangle"></i>
       <p>Failed to load results. Please try again.</p>
     </div>
   `;
-  document.querySelector('.results-section').classList.add('visible');
+  
+  resultsSection.classList.add('visible');
+}
+
+function displayNoResults() {
+  const geoResults = document.getElementById('geoResults');
+  const resultsSection = document.querySelector('.results-section');
+  
+  geoResults.innerHTML = `
+    <div class="no-geo-results">
+      <i class="fas fa-search"></i>
+      <p>No tenants found within 250m. Try another location.</p>
+    </div>
+  `;
+  
+  resultsSection.classList.add('visible');
 }
 
 async function searchNearbyEircodes(lat, lng) {
@@ -93,26 +115,18 @@ async function searchNearbyEircodes(lat, lng) {
 
     const match = text.match(/^cb\((.*)\);?$/s);
     if (!match) {
-      throw new Error('Failed to parse JSONP response:\n' + text.slice(0, 300));
+      throw new Error('Failed to parse JSONP response');
     }
 
     const data = JSON.parse(match[1]);
-    
-    // Преобразуем расстояние в метры и округляем
-    return (data.results || []).map(result => {
-      return {
-        ...result,
-        // Преобразуем километры в метры и округляем
-        distance: Math.round(result.distance * 1000)
-      };
-    });
+    return data.results || [];
   } catch (error) {
     console.error('Geo search error:', error);
-    return [];
+    throw error; // Пробрасываем ошибку выше
   }
 }
 
-function addResultMarkers(results, centerLat, centerLng) {
+function addResultMarkers(results) {
   // Очистить предыдущие маркеры
   resultLayerGroup.clearLayers();
   
@@ -126,15 +140,6 @@ function addResultMarkers(results, centerLat, centerLng) {
         iconAnchor: [50, 40]
       })
     });
-    
-    // Всплывающая подсказка с расстоянием в метрах
-    marker.bindPopup(`
-      <div class="map-popup">
-        <strong>${result.eircode}</strong><br>
-        ${result.address}<br>
-        <small>${result.distance} m away</small>
-      </div>
-    `);
     
     resultLayerGroup.addLayer(marker);
   });
@@ -157,36 +162,31 @@ function displayGeoResults(results) {
   // Очистить предыдущие результаты
   geoResults.innerHTML = '';
   
-  if (results.length === 0) {
-    geoResults.innerHTML = `
-      <div class="no-geo-results">
-        <i class="fas fa-search"></i>
-        <p>No tenants found within 250 m. Try another location.</p>
+  // Добавить результаты
+  results.forEach(result => {
+    const li = document.createElement('div');
+    li.className = 'geo-result-item';
+    
+    // Конвертируем километры в метры
+    const distanceInMeters = Math.round((result.distance || 0) * 1000);
+    
+    li.innerHTML = `
+      <span class="geo-result-code">${result.eircode}</span>
+      <div class="geo-result-address">${result.address}</div>
+      <div class="geo-result-distance">
+        <i class="fas fa-route"></i> ${distanceInMeters} m away
       </div>
     `;
-  } else {
-    // Добавить результаты с расстоянием в метрах
-    results.forEach(result => {
-      const li = document.createElement('div');
-      li.className = 'geo-result-item';
-      li.innerHTML = `
-        <span class="geo-result-code">${result.eircode}</span>
-        <div class="geo-result-address">${result.address}</div>
-        <div class="geo-result-distance">
-          <i class="fas fa-route"></i> ${result.distance} m away
-        </div>
-      `;
-      
-      li.addEventListener('click', () => {
-        document.getElementById('textInput').value = result.eircode;
-        setSearchMode('address');
-        filterAndRender(result.eircode);
-        closeMapModal();
-      });
-      
-      geoResults.appendChild(li);
+    
+    li.addEventListener('click', () => {
+      document.getElementById('textInput').value = result.eircode;
+      setSearchMode('address');
+      filterAndRender(result.eircode);
+      closeMapModal();
     });
-  }
+    
+    geoResults.appendChild(li);
+  });
   
   // Показать секцию результатов с анимацией
   resultsSection.classList.add('visible');
@@ -199,7 +199,10 @@ function openMapModal() {
   
   // Сбросить состояние
   const resultsSection = document.querySelector('.results-section');
-  if (resultsSection) resultsSection.classList.remove('visible');
+  if (resultsSection) {
+    resultsSection.classList.remove('visible');
+    document.getElementById('geoResults').innerHTML = '';
+  }
   
   // Показать начальное состояние
   const initialState = document.querySelector('.map-initial-state');
@@ -279,11 +282,6 @@ function addCustomMarkerStyles() {
       0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.6); }
       70% { box-shadow: 0 0 0 16px rgba(234, 67, 53, 0); }
       100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); }
-    }
-    
-    .map-popup {
-      min-width: 200px;
-      font-size: 14px;
     }
   `;
   document.head.appendChild(style);
