@@ -1,18 +1,19 @@
 ﻿// scripts/mapModule.js
 let map;
 let clickMarker;
-let resultLayerGroup;
+let resultLayerGroup = null; // Инициализируем как null
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.943675, -8.950022], 13);
+  map = L.map('map').setView([53.3498, -6.2603], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   
-  // Создаем группу слоев для результатов
-  resultLayerGroup = L.layerGroup().addTo(map);
+  // Создаем новую группу слоев
+  resultLayerGroup = L.layerGroup();
+  resultLayerGroup.addTo(map);
   
   // Добавляем слой для начального состояния
   const mapContainer = document.getElementById('map');
@@ -20,7 +21,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250 m</p>
+    <p>Tap anywhere on the map to find tenants within 250m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -110,11 +111,22 @@ async function searchNearbyEircodes(lat, lng) {
 
 function updateMarkersAndList(results) {
   // Очищаем предыдущие маркеры
-  resultLayerGroup.clearLayers();
+  if (resultLayerGroup) {
+    resultLayerGroup.clearLayers();
+  } else {
+    // Если группа слоев не создана, создаем новую
+    resultLayerGroup = L.layerGroup().addTo(map);
+  }
+  
+  // Создаем границы для масштабирования
+  let bounds = L.latLngBounds();
   
   // Добавляем новые маркеры
   results.forEach(result => {
-    const marker = L.marker([result.lat, result.lng], {
+    const latLng = L.latLng(result.lat, result.lng);
+    bounds.extend(latLng);
+    
+    const marker = L.marker(latLng, {
       icon: L.divIcon({
         className: 'eircode-marker',
         html: `<div>${result.eircode}</div>`,
@@ -130,11 +142,8 @@ function updateMarkersAndList(results) {
   displayGeoResults(results);
   
   // Автомасштабирование только если есть результаты
-  if (results.length > 0) {
-    const bounds = resultLayerGroup.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
+  if (results.length > 0 && bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [50, 50] });
   }
 }
 
@@ -153,7 +162,7 @@ function displayGeoResults(results) {
     geoResults.innerHTML = `
       <div class="no-geo-results">
         <i class="fas fa-search"></i>
-        <p>No tenants found within 250 m. Try another location.</p>
+        <p>No tenants found within 250m. Try another location.</p>
       </div>
     `;
   } else {
@@ -214,7 +223,12 @@ function openMapModal() {
   } else {
     // Сбросить вид карты
     map.setView([53.3498, -6.2603], 13);
-    resultLayerGroup.clearLayers();
+    
+    // Очистить маркеры
+    if (resultLayerGroup) {
+      resultLayerGroup.clearLayers();
+    }
+    
     if (clickMarker) map.removeLayer(clickMarker);
     clickMarker = null;
     map.invalidateSize();
