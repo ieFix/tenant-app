@@ -1,5 +1,5 @@
 ﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw7DlW9LzyasLe-E609RPx1y-cLMjJDnUXMXMq-PMzZ8_cZa1pK-awkv52zLOFFC5MuaQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLJF_0E2elH6viFfohLMWb7uWkHouwxG-mgAWEhd1JXh9mrdw8Gu7YnbVHE_iNEgoFTw/exec';
 const CACHE_KEY = 'tenantData';
 
 // Global state
