@@ -91,18 +91,36 @@
   </div>
 
   <!-- Map Search Modal -->
-  <div id="mapModal" class="modal">
-    <div class="modal-content">
-      <span class="close-btn">&times;</span>
+<div id="mapModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
       <h3 class="modal-title">Search Tenants by Location</h3>
-      <div class="modal-subtitle">Click on the map to find tenants within 250m</div>
+      <span class="close-btn">&times;</span>
+    </div>
+    
+    <div class="modal-body">
+      <div class="map-instruction">
+        <i class="fas fa-info-circle"></i>
+        <span>Tap anywhere on the map to find tenants within 250m</span>
+      </div>
+      
       <div id="map"></div>
-      <div class="results-container">
-        <h4>Found within 250m:</h4>
+      
+      <div class="results-header">
+        <h4>Found within 250m</h4>
+        <div class="results-count" id="resultsCount">0 locations</div>
+      </div>
+      
+      <div class="results-container" id="geoResultsContainer">
+        <div class="initial-state">
+          <i class="fas fa-map-marker-alt"></i>
+          <p>Tap on the map to find nearby tenants</p>
+        </div>
         <ul id="geoResults"></ul>
       </div>
     </div>
   </div>
+</div>
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -111,7 +129,7 @@
   <script src="scripts/caching.js?ver=1.0"></script>
   <script src="scripts/search.js?ver=1.0"></script>
   <script src="scripts/render.js?ver=1.0"></script>
-  <script src="scripts/app.js?ver=1.12"></script>
-  <script src="scripts/mapModule.js?ver=1.1"></script>
+  <script src="scripts/app.js?ver=1.13"></script>
+  <script src="scripts/mapModule.js?ver=1.2"></script>
 </body>
 </html>
