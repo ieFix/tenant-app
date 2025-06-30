@@ -18,7 +18,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250m</p>
+    <p>Tap anywhere on the map to find tenants within 250 m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -76,13 +76,16 @@ function showMapPreloader(show) {
 
 function showErrorState() {
   const geoResults = document.getElementById('geoResults');
+  const resultsSection = document.querySelector('.results-section');
+  
   geoResults.innerHTML = `
     <div class="no-geo-results">
       <i class="fas fa-exclamation-triangle"></i>
       <p>Failed to load results. Please try again.</p>
     </div>
   `;
-  document.querySelector('.results-section').classList.add('visible');
+  
+  resultsSection.classList.add('visible');
 }
 
 async function searchNearbyEircodes(lat, lng) {
@@ -93,7 +96,7 @@ async function searchNearbyEircodes(lat, lng) {
 
     const match = text.match(/^cb\((.*)\);?$/s);
     if (!match) {
-      throw new Error('Failed to parse JSONP response:\n' + text.slice(0, 300));
+      throw new Error('Не удалось разобрать JSONP-ответ:\n' + text.slice(0, 300));
     }
 
     const data = JSON.parse(match[1]);
