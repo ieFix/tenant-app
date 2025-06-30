@@ -5,7 +5,7 @@ let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.3498, -6.2603], 13);
+  map = L.map('map').setView([53.943675, -8.950022], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -47,13 +47,8 @@ function initMap() {
     // Поиск
     try {
       const results = await searchNearbyEircodes(lat, lng);
-      // Убедимся, что результаты есть перед отображением
-      if (results && results.length > 0) {
-        displayGeoResults(results);
-        addResultMarkers(results);
-      } else {
-        displayNoResults();
-      }
+      displayGeoResults(results);
+      addResultMarkers(results);
     } catch (error) {
       console.error('Search error:', error);
       showErrorState();
@@ -93,20 +88,6 @@ function showErrorState() {
   resultsSection.classList.add('visible');
 }
 
-function displayNoResults() {
-  const geoResults = document.getElementById('geoResults');
-  const resultsSection = document.querySelector('.results-section');
-  
-  geoResults.innerHTML = `
-    <div class="no-geo-results">
-      <i class="fas fa-search"></i>
-      <p>No tenants found within 250m. Try another location.</p>
-    </div>
-  `;
-  
-  resultsSection.classList.add('visible');
-}
-
 async function searchNearbyEircodes(lat, lng) {
   try {
     const url = `${SCRIPT_URL}?action=geo&lat=${lat}&lng=${lng}&callback=cb`;
@@ -122,7 +103,7 @@ async function searchNearbyEircodes(lat, lng) {
     return data.results || [];
   } catch (error) {
     console.error('Geo search error:', error);
-    throw error; // Пробрасываем ошибку выше
+    throw error;
   }
 }
 
@@ -162,33 +143,39 @@ function displayGeoResults(results) {
   // Очистить предыдущие результаты
   geoResults.innerHTML = '';
   
-  // Добавить результаты
-  results.forEach(result => {
-    const li = document.createElement('div');
-    li.className = 'geo-result-item';
-    
-    // Конвертируем километры в метры
-    const distanceInMeters = Math.round((result.distance || 0) * 1000);
-    
-    li.innerHTML = `
-      <span class="geo-result-code">${result.eircode}</span>
-      <div class="geo-result-address">${result.address}</div>
-      <div class="geo-result-distance">
-        <i class="fas fa-route"></i> ${distanceInMeters} m away
+  if (results.length === 0) {
+    geoResults.innerHTML = `
+      <div class="no-geo-results">
+        <i class="fas fa-search"></i>
+        <p>No tenants found within 250m. Try another location.</p>
       </div>
     `;
-    
-    li.addEventListener('click', () => {
-      document.getElementById('textInput').value = result.eircode;
-      setSearchMode('address');
-      filterAndRender(result.eircode);
-      closeMapModal();
+  } else {
+    // Добавить результаты в оригинальном формате
+    results.forEach(result => {
+      const li = document.createElement('div');
+      li.className = 'geo-result-item';
+      
+      li.innerHTML = `
+        <span class="geo-result-code">${result.eircode}</span>
+        <div class="geo-result-address">${result.address}</div>
+        <div class="geo-result-distance">
+          <i class="fas fa-route"></i> ${result.distance} km away
+        </div>
+      `;
+      
+      li.addEventListener('click', () => {
+        document.getElementById('textInput').value = result.eircode;
+        setSearchMode('address');
+        filterAndRender(result.eircode);
+        closeMapModal();
+      });
+      
+      geoResults.appendChild(li);
     });
-    
-    geoResults.appendChild(li);
-  });
+  }
   
-  // Показать секцию результатов с анимацией
+  // Показать секцию результатов
   resultsSection.classList.add('visible');
 }
 
