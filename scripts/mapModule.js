@@ -6,12 +6,22 @@ let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.3498, -6.2603], 13);
+  map = L.map('map').setView([53.857901, -9.297163], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   
+  // Добавляем слой для начального состояния
+  const mapContainer = document.getElementById('map');
+  const initialState = document.createElement('div');
+  initialState.className = 'map-initial-state';
+  initialState.innerHTML = `
+    <i class="fas fa-map-marker-alt"></i>
+    <p>Tap anywhere on the map to find tenants within 250m</p>
+  `;
+  mapContainer.appendChild(initialState);
+
   // Группа для маркеров результатов
   resultLayerGroup = L.layerGroup().addTo(map);
 
@@ -19,19 +29,21 @@ function initMap() {
   map.on('click', async (e) => {
     const { lat, lng } = e.latlng;
     
-    // Обновление маркера клика
+    // Показываем прелоадер
+    showMapPreloader(true);
+    
+    // Скрываем начальное состояние
+    document.querySelector('.map-initial-state').classList.add('hidden');
+    
+    // Обновление центрального маркера
     if (clickMarker) map.removeLayer(clickMarker);
     clickMarker = L.marker([lat, lng], {
       icon: L.divIcon({
-        className: 'click-marker',
-        html: '<div class="marker-pulse"></div><div class="marker-center"></div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        className: 'center-marker',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       })
     }).addTo(map);
-    
-    // Показать загрузку
-    showLoadingState();
     
     // Поиск
     try {
@@ -40,19 +52,26 @@ function initMap() {
       addResultMarkers(results, lat, lng);
     } catch (error) {
       showErrorState();
+    } finally {
+      showMapPreloader(false);
     }
   });
 }
 
-function showLoadingState() {
-  const geoResults = document.getElementById('geoResults');
-  const container = document.getElementById('geoResultsContainer');
+function showMapPreloader(show) {
+  const preloader = document.querySelector('.map-preloader');
+  if (!preloader) {
+    const preloaderDiv = document.createElement('div');
+    preloaderDiv.className = 'map-preloader';
+    preloaderDiv.innerHTML = '<div class="loader"></div>';
+    document.querySelector('.modal-body').appendChild(preloaderDiv);
+  }
   
-  geoResults.classList.remove('visible');
-  container.querySelector('.initial-state').innerHTML = `
-    <i class="fas fa-spinner fa-spin"></i>
-    <p>Searching for nearby tenants...</p>
-  `;
+  if (show) {
+    document.querySelector('.map-preloader').classList.add('active');
+  } else {
+    document.querySelector('.map-preloader').classList.remove('active');
+  }
 }
 
 function showErrorState() {
@@ -71,7 +90,7 @@ async function searchNearbyEircodes(lat, lng) {
 
     const match = text.match(/^cb\((.*)\);?$/s);
     if (!match) {
-      throw new Error('Не удалось разобрать JSONP-ответ:\n' + text.slice(0, 300));
+      throw new Error('Failed to parse JSONP response:\n' + text.slice(0, 300));
     }
 
     const data = JSON.parse(match[1]);
@@ -82,73 +101,18 @@ async function searchNearbyEircodes(lat, lng) {
   }
 }
 
-
-function displayGeoResults(results) {
-  const geoResults = document.getElementById('geoResults');
-  const container = document.getElementById('geoResultsContainer');
-  const resultsCount = document.getElementById('resultsCount');
-  const initialState = container.querySelector('.initial-state');
-  
-  // Обновить счетчик
-  resultsCount.textContent = `${results.length} ${results.length === 1 ? 'location' : 'locations'}`;
-  
-  // Очистить предыдущие результаты
-  geoResults.innerHTML = '';
-  
-  if (results.length === 0) {
-    initialState.innerHTML = `
-      <i class="fas fa-map-marker-alt"></i>
-      <p>No tenants found within 250m. Try another location.</p>
-    `;
-    geoResults.classList.remove('visible');
-    return;
-  }
-  
-  // Скрыть начальное состояние и показать результаты
-  initialState.style.display = 'none';
-  geoResults.classList.add('visible');
-  
-  // Добавить результаты
-  results.forEach(result => {
-    const li = document.createElement('li');
-    li.className = 'geo-result-item';
-    li.innerHTML = `
-      <span class="geo-result-code">${result.eircode}</span>
-      <span class="geo-result-address">${result.address}</span>
-      <span class="geo-result-distance">${result.distance} km away</span>
-    `;
-    
-    li.addEventListener('click', () => {
-      document.getElementById('textInput').value = result.eircode;
-      setSearchMode('address');
-      filterAndRender(result.eircode);
-      closeMapModal();
-    });
-    
-    geoResults.appendChild(li);
-  });
-}
-
 function addResultMarkers(results, centerLat, centerLng) {
   // Очистить предыдущие маркеры
   resultLayerGroup.clearLayers();
-  
-  // Добавить маркер для центральной точки
-  resultLayerGroup.addLayer(L.circleMarker([centerLat, centerLng], {
-    color: '#4285F4',
-    fillColor: '#4285F4',
-    fillOpacity: 0.2,
-    radius: 10
-  }));
   
   // Добавить маркеры для результатов
   results.forEach(result => {
     const marker = L.marker([result.lat, result.lng], {
       icon: L.divIcon({
-        className: 'result-marker',
-        html: '<div class="marker-pin"></div><div class="marker-label">📍</div>',
-        iconSize: [30, 42],
-        iconAnchor: [15, 42]
+        className: 'eircode-marker',
+        html: `<div>${result.eircode}</div>`,
+        iconSize: [100, 40],
+        iconAnchor: [50, 40]
       })
     });
     
@@ -157,7 +121,7 @@ function addResultMarkers(results, centerLat, centerLng) {
       <div class="map-popup">
         <strong>${result.eircode}</strong><br>
         ${result.address}<br>
-        <small>${result.distance} km</small>
+        <small>${result.distance} km away</small>
       </div>
     `);
     
@@ -167,31 +131,69 @@ function addResultMarkers(results, centerLat, centerLng) {
   // Автомасштабирование, чтобы показать все маркеры
   if (results.length > 0) {
     const bounds = resultLayerGroup.getBounds();
-    map.fitBounds(bounds, { padding: [50, 50] });
+    map.fitBounds(bounds, { padding: [100, 100] });
   }
 }
 
-// Управление модальным окном
+function displayGeoResults(results) {
+  const geoResults = document.getElementById('geoResults');
+  const resultsCount = document.getElementById('resultsCount');
+  const resultsSection = document.querySelector('.results-section');
+  
+  // Обновить счетчик
+  resultsCount.textContent = `${results.length} ${results.length === 1 ? 'location' : 'locations'}`;
+  
+  // Очистить предыдущие результаты
+  geoResults.innerHTML = '';
+  
+  if (results.length === 0) {
+    geoResults.innerHTML = `
+      <div class="no-geo-results">
+        <i class="fas fa-search"></i>
+        <p>No tenants found within 250m. Try another location.</p>
+      </div>
+    `;
+  } else {
+    // Добавить результаты
+    results.forEach(result => {
+      const li = document.createElement('div');
+      li.className = 'geo-result-item';
+      li.innerHTML = `
+        <span class="geo-result-code">${result.eircode}</span>
+        <div class="geo-result-address">${result.address}</div>
+        <div class="geo-result-distance">
+          <i class="fas fa-route"></i> ${result.distance} km away
+        </div>
+      `;
+      
+      li.addEventListener('click', () => {
+        document.getElementById('textInput').value = result.eircode;
+        setSearchMode('address');
+        filterAndRender(result.eircode);
+        closeMapModal();
+      });
+      
+      geoResults.appendChild(li);
+    });
+  }
+  
+  // Показать секцию результатов с анимацией
+  resultsSection.classList.add('visible');
+}
+
 function openMapModal() {
   const modal = document.getElementById('mapModal');
   modal.style.display = 'block';
   document.body.style.overflow = 'hidden';
   
   // Сбросить состояние
-  const container = document.getElementById('geoResultsContainer');
-  const initialState = container.querySelector('.initial-state');
-  const geoResults = document.getElementById('geoResults');
-  const resultsCount = document.getElementById('resultsCount');
+  const resultsSection = document.querySelector('.results-section');
+  if (resultsSection) resultsSection.classList.remove('visible');
   
-  resultsCount.textContent = '0 locations';
-  geoResults.innerHTML = '';
-  geoResults.classList.remove('visible');
-  initialState.style.display = 'flex';
-  initialState.innerHTML = `
-    <i class="fas fa-map-marker-alt"></i>
-    <p>Tap on the map to find nearby tenants</p>
-  `;
-  
+  // Показать начальное состояние
+  const initialState = document.querySelector('.map-initial-state');
+  if (initialState) initialState.classList.remove('hidden');
+
   // Инициализация карты при первом открытии
   if (!map) {
     setTimeout(() => {
@@ -206,6 +208,10 @@ function openMapModal() {
     if (clickMarker) map.removeLayer(clickMarker);
     clickMarker = null;
     map.invalidateSize();
+    
+    // Показать начальное состояние
+    const initialState = document.querySelector('.map-initial-state');
+    if (initialState) initialState.classList.remove('hidden');
   }
 }
 
@@ -214,61 +220,60 @@ function closeMapModal() {
   document.body.style.overflow = '';
 }
 
-// Добавить кастомные стили маркеров
 function addCustomMarkerStyles() {
   const style = document.createElement('style');
   style.textContent = `
-    .click-marker {
+    .center-marker {
+      width: 24px;
+      height: 24px;
+      background: #ea4335;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 0 0 8px rgba(234, 67, 53, 0.4);
       position: relative;
+      z-index: 1000;
+      animation: pulse 2s infinite;
     }
     
-    .marker-pulse {
-      position: absolute;
-      width: 30px;
-      height: 30px;
-      background: #4285F4;
-      border-radius: 50%;
-      opacity: 0.7;
-      animation: pulse 1.5s infinite;
-      transform: translate(-50%, -50%);
-    }
-    
-    .marker-center {
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      background: #fff;
-      border: 2px solid #4285F4;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 2;
-    }
-    
-    .result-marker .marker-pin {
-      position: absolute;
-      width: 30px;
-      height: 42px;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 42"><path fill="%234285F4" d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 27 15 27s15-16.5 15-27c0-8.3-6.7-15-15-15z"/></svg>');
+    .eircode-marker {
+      background: var(--primary);
+      color: white;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-weight: bold;
+      font-size: 13px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      border: 2px solid white;
+      text-align: center;
+      min-width: 80px;
       transform: translate(-50%, -100%);
+      position: relative;
+      z-index: 500;
+      transition: all 0.2s ease;
     }
     
-    .result-marker .marker-label {
+    .eircode-marker::after {
+      content: '';
       position: absolute;
-      top: 6px;
+      bottom: -8px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 14px;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid var(--primary);
+    }
+    
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.6); }
+      70% { box-shadow: 0 0 0 16px rgba(234, 67, 53, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); }
     }
     
     .map-popup {
       min-width: 200px;
       font-size: 14px;
-    }
-    
-    @keyframes pulse {
-      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
-      70% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
-      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
     }
   `;
   document.head.appendChild(style);
