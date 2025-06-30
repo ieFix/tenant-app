@@ -11,7 +11,7 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   
-  // Инициализация группы слоев для результатов
+  // Создаем группу слоев для результатов
   resultLayerGroup = L.layerGroup().addTo(map);
   
   // Добавляем слой для начального состояния
@@ -47,8 +47,9 @@ function initMap() {
     // Поиск
     try {
       const results = await searchNearbyEircodes(lat, lng);
-      displayGeoResults(results);
-      addResultMarkers(results);
+      
+      // Обновляем маркеры и список
+      updateMarkersAndList(results);
     } catch (error) {
       console.error('Search error:', error);
       showErrorState();
@@ -59,18 +60,19 @@ function initMap() {
 }
 
 function showMapPreloader(show) {
-  const preloader = document.querySelector('.map-preloader');
+  let preloader = document.querySelector('.map-preloader');
+  
   if (!preloader) {
-    const preloaderDiv = document.createElement('div');
-    preloaderDiv.className = 'map-preloader';
-    preloaderDiv.innerHTML = '<div class="loader"></div>';
-    document.querySelector('.modal-body').appendChild(preloaderDiv);
+    preloader = document.createElement('div');
+    preloader.className = 'map-preloader';
+    preloader.innerHTML = '<div class="loader"></div>';
+    document.querySelector('.modal-body').appendChild(preloader);
   }
   
   if (show) {
-    document.querySelector('.map-preloader').classList.add('active');
+    preloader.classList.add('active');
   } else {
-    document.querySelector('.map-preloader').classList.remove('active');
+    preloader.classList.remove('active');
   }
 }
 
@@ -99,19 +101,18 @@ async function searchNearbyEircodes(lat, lng) {
       throw new Error('Failed to parse JSONP response');
     }
 
-    const data = JSON.parse(match[1]);
-    return data.results || [];
+    return JSON.parse(match[1]).results || [];
   } catch (error) {
     console.error('Geo search error:', error);
     throw error;
   }
 }
 
-function addResultMarkers(results) {
-  // Очистить предыдущие маркеры
+function updateMarkersAndList(results) {
+  // Очищаем предыдущие маркеры
   resultLayerGroup.clearLayers();
   
-  // Добавить маркеры для результатов
+  // Добавляем новые маркеры
   results.forEach(result => {
     const marker = L.marker([result.lat, result.lng], {
       icon: L.divIcon({
@@ -125,11 +126,14 @@ function addResultMarkers(results) {
     resultLayerGroup.addLayer(marker);
   });
   
+  // Обновляем список результатов
+  displayGeoResults(results);
+  
   // Автомасштабирование только если есть результаты
   if (results.length > 0) {
     const bounds = resultLayerGroup.getBounds();
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [100, 100] });
+      map.fitBounds(bounds, { padding: [50, 50] });
     }
   }
 }
@@ -191,6 +195,7 @@ function openMapModal() {
   if (resultsSection) {
     resultsSection.classList.remove('visible');
     document.getElementById('geoResults').innerHTML = '';
+    document.getElementById('resultsCount').textContent = '0 locations';
   }
   
   // Показать начальное состояние
@@ -199,11 +204,13 @@ function openMapModal() {
 
   // Инициализация карты при первом открытии
   if (!map) {
+    initMap();
+    addCustomMarkerStyles();
+    
+    // Даем время на инициализацию карты
     setTimeout(() => {
-      initMap();
       map.invalidateSize();
-      addCustomMarkerStyles();
-    }, 100);
+    }, 50);
   } else {
     // Сбросить вид карты
     map.setView([53.3498, -6.2603], 13);
@@ -223,7 +230,11 @@ function closeMapModal() {
 }
 
 function addCustomMarkerStyles() {
+  // Проверяем, не добавлены ли стили уже
+  if (document.getElementById('leaflet-custom-styles')) return;
+  
   const style = document.createElement('style');
+  style.id = 'leaflet-custom-styles';
   style.textContent = `
     .center-marker {
       width: 24px;
@@ -278,7 +289,10 @@ function addCustomMarkerStyles() {
 
 // Инициализация после загрузки DOM
 document.addEventListener('DOMContentLoaded', () => {
+  // Закрытие модального окна
   document.querySelector('.close-btn').addEventListener('click', closeMapModal);
+  
+  // Открытие модального окна карты
   document.getElementById('mapSearchButton').addEventListener('click', openMapModal);
   
   // Закрытие модального окна при клике вне его
