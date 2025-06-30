@@ -6,7 +6,7 @@ let resultLayerGroup;
 
 function initMap() {
   // Инициализация карты
-  map = L.map('map').setView([53.857901, -9.297163], 13);
+  map = L.map('map').setView([53.943675, -8.950022], 13);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -75,11 +75,14 @@ function showMapPreloader(show) {
 }
 
 function showErrorState() {
-  const container = document.getElementById('geoResultsContainer');
-  container.querySelector('.initial-state').innerHTML = `
-    <i class="fas fa-exclamation-triangle"></i>
-    <p>Failed to load results. Please try again.</p>
+  const geoResults = document.getElementById('geoResults');
+  geoResults.innerHTML = `
+    <div class="no-geo-results">
+      <i class="fas fa-exclamation-triangle"></i>
+      <p>Failed to load results. Please try again.</p>
+    </div>
   `;
+  document.querySelector('.results-section').classList.add('visible');
 }
 
 async function searchNearbyEircodes(lat, lng) {
@@ -94,7 +97,15 @@ async function searchNearbyEircodes(lat, lng) {
     }
 
     const data = JSON.parse(match[1]);
-    return data.results || [];
+    
+    // Преобразуем расстояние в метры и округляем
+    return (data.results || []).map(result => {
+      return {
+        ...result,
+        // Преобразуем километры в метры и округляем
+        distance: Math.round(result.distance * 1000)
+      };
+    });
   } catch (error) {
     console.error('Geo search error:', error);
     return [];
@@ -116,12 +127,12 @@ function addResultMarkers(results, centerLat, centerLng) {
       })
     });
     
-    // Всплывающая подсказка
+    // Всплывающая подсказка с расстоянием в метрах
     marker.bindPopup(`
       <div class="map-popup">
         <strong>${result.eircode}</strong><br>
         ${result.address}<br>
-        <small>${result.distance} km away</small>
+        <small>${result.distance} m away</small>
       </div>
     `);
     
@@ -154,7 +165,7 @@ function displayGeoResults(results) {
       </div>
     `;
   } else {
-    // Добавить результаты
+    // Добавить результаты с расстоянием в метрах
     results.forEach(result => {
       const li = document.createElement('div');
       li.className = 'geo-result-item';
@@ -162,7 +173,7 @@ function displayGeoResults(results) {
         <span class="geo-result-code">${result.eircode}</span>
         <div class="geo-result-address">${result.address}</div>
         <div class="geo-result-distance">
-          <i class="fas fa-route"></i> ${result.distance} km away
+          <i class="fas fa-route"></i> ${result.distance} m away
         </div>
       `;
       
@@ -210,7 +221,6 @@ function openMapModal() {
     map.invalidateSize();
     
     // Показать начальное состояние
-    const initialState = document.querySelector('.map-initial-state');
     if (initialState) initialState.classList.remove('hidden');
   }
 }
