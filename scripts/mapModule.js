@@ -1,11 +1,16 @@
 ﻿// scripts/mapModule.js
 let map;
 let clickMarker;
-let resultLayerGroup = null; // Инициализируем как null
+let resultLayerGroup = null;
+
+// Ваши кастомные координаты
+const DEFAULT_LAT = 53.943675;
+const DEFAULT_LNG = -8.950022;
+const DEFAULT_ZOOM = 13;
 
 function initMap() {
-  // Инициализация карты
-  map = L.map('map').setView([53.943675, -8.950022], 13);
+  // Инициализация карты с вашими координатами
+  map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -21,7 +26,7 @@ function initMap() {
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250 m</p>
+    <p>Tap anywhere on the map to find tenants within 250m</p>
   `;
   mapContainer.appendChild(initialState);
 
@@ -121,7 +126,7 @@ function updateMarkersAndList(results) {
   // Создаем границы для масштабирования
   let bounds = L.latLngBounds();
   
-  // Добавляем новые маркеры
+  // Добавляем новые маркеры с всплывающими подсказками
   results.forEach(result => {
     const latLng = L.latLng(result.lat, result.lng);
     bounds.extend(latLng);
@@ -133,7 +138,13 @@ function updateMarkersAndList(results) {
         iconSize: [100, 40],
         iconAnchor: [50, 40]
       })
-    });
+    }).bindPopup(`
+      <div class="map-popup">
+        <strong>${result.eircode}</strong><br>
+        ${result.address}<br>
+        <small>${result.distance} km away</small>
+      </div>
+    `);
     
     resultLayerGroup.addLayer(marker);
   });
@@ -162,7 +173,7 @@ function displayGeoResults(results) {
     geoResults.innerHTML = `
       <div class="no-geo-results">
         <i class="fas fa-search"></i>
-        <p>No tenants found within 250 m. Try another location.</p>
+        <p>No tenants found within 250m. Try another location.</p>
       </div>
     `;
   } else {
@@ -221,8 +232,8 @@ function openMapModal() {
       map.invalidateSize();
     }, 50);
   } else {
-    // Сбросить вид карты
-    map.setView([53.3498, -6.2603], 13);
+    // Сбросить вид карты на ваши координаты
+    map.setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
     
     // Очистить маркеры
     if (resultLayerGroup) {
@@ -231,7 +242,12 @@ function openMapModal() {
     
     if (clickMarker) map.removeLayer(clickMarker);
     clickMarker = null;
-    map.invalidateSize();
+    
+    // Гарантируем правильное отображение
+    setTimeout(() => {
+      map.invalidateSize();
+      map.setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
+    }, 50);
     
     // Показать начальное состояние
     if (initialState) initialState.classList.remove('hidden');
@@ -296,6 +312,18 @@ function addCustomMarkerStyles() {
       0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.6); }
       70% { box-shadow: 0 0 0 16px rgba(234, 67, 53, 0); }
       100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); }
+    }
+    
+    .map-popup {
+      min-width: 200px;
+      font-size: 14px;
+      padding: 8px;
+      z-index: 2001; /* Поверх модального окна */
+    }
+    
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
     }
   `;
   document.head.appendChild(style);
