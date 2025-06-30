@@ -11,18 +11,18 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   
+  // Инициализация группы слоев для результатов
+  resultLayerGroup = L.layerGroup().addTo(map);
+  
   // Добавляем слой для начального состояния
   const mapContainer = document.getElementById('map');
   const initialState = document.createElement('div');
   initialState.className = 'map-initial-state';
   initialState.innerHTML = `
     <i class="fas fa-map-marker-alt"></i>
-    <p>Tap anywhere on the map to find tenants within 250m</p>
+    <p>Tap anywhere on the map to find tenants within 250 m</p>
   `;
   mapContainer.appendChild(initialState);
-
-  // Группа для маркеров результатов
-  resultLayerGroup = L.layerGroup().addTo(map);
 
   // Обработчик клика
   map.on('click', async (e) => {
@@ -125,10 +125,12 @@ function addResultMarkers(results) {
     resultLayerGroup.addLayer(marker);
   });
   
-  // Автомасштабирование, чтобы показать все маркеры
+  // Автомасштабирование только если есть результаты
   if (results.length > 0) {
     const bounds = resultLayerGroup.getBounds();
-    map.fitBounds(bounds, { padding: [100, 100] });
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [100, 100] });
+    }
   }
 }
 
@@ -147,11 +149,11 @@ function displayGeoResults(results) {
     geoResults.innerHTML = `
       <div class="no-geo-results">
         <i class="fas fa-search"></i>
-        <p>No tenants found within 250m. Try another location.</p>
+        <p>No tenants found within 250 m. Try another location.</p>
       </div>
     `;
   } else {
-    // Добавить результаты в оригинальном формате
+    // Добавить результаты
     results.forEach(result => {
       const li = document.createElement('div');
       li.className = 'geo-result-item';
