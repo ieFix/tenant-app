@@ -196,7 +196,7 @@ function loadData() {
       const cacheTime = new Date(cacheData.lastModified).getTime();
       const serverTime = serverLastModified.getTime();
       
-      if (serverTime <= cacheTime + 5000) {
+      if (serverTime <= cacheTime + 432000000) {
         tenantData = cacheData.data;
         initCleanData();
         loader.style.display = 'none';
