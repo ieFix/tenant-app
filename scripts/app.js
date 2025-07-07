@@ -1,5 +1,5 @@
-﻿// Configuration
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLJF_0E2elH6viFfohLMWb7uWkHouwxG-mgAWEhd1JXh9mrdw8Gu7YnbVHE_iNEgoFTw/exec';
+// Configuration
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzjNiBhXIGrUDhsyOMeg2WcxrnW8_kvH2g_qGiMYcmfWYEM-KoYPqsJsiPFHzR-0WmfFA/exec';
 const CACHE_KEY = 'tenantData';
 
 // Global state
@@ -185,78 +185,62 @@ function updateSearchHint() {
 }
 
 // Load data
-let isLoadingData = false;
-
 function loadData() {
-  if (isLoadingData) {
-    console.log('loadData already in progress, skipping');
-    return;
-  }
+  let isLoadingData = false;
+
+  if (isLoadingData) return;
   isLoadingData = true;
-  
-  console.log('Starting loadData');
-  
-  getLastModified().then(serverLastModified => {
-    console.log('Server Last Modified:', serverLastModified.toISOString());
-    const stored = localStorage.getItem(CACHE_KEY);
-    console.log('Stored Cache:', stored);
-    
-    const cacheData = stored ? JSON.parse(stored) : null;
-    console.log('Parsed Cache Data:', cacheData);
-    
-    if (cacheData && cacheData.data && cacheData.lastModified) {
-      const cacheTime = new Date(cacheData.lastModified).getTime();
-      const serverTime = serverLastModified.getTime();
-      
-      console.log('Server Time (ms):', serverTime);
-      console.log('Cache Time (ms):', cacheTime);
-      console.log('Time Difference (ms):', serverTime - cacheTime);
-      console.log('Is Cache Valid?', serverTime <= cacheTime + 432000000);
-      
-      if (!isNaN(cacheTime) && !isNaN(serverTime) && serverTime <= cacheTime + 432000000) {
-        console.log('Using cached data');
-        searchHint.textContent = 'Данные загружены из кэша';
-        searchHint.style.color = 'var(--success)';
-        setTimeout(() => {
-          updateSearchHint();
-          searchHint.style.color = 'var(--text-secondary)';
-        }, 3000);
-        tenantData = cacheData.data;
-        initCleanData();
-        if (textInput.value) filterAndRender(textInput.value);
-        isLoadingData = false;
-        return;
-      } else {
-        console.log('Cache invalid, fetching new data');
-      }
-    } else {
-      console.log('No valid cache found');
-    }
-    
-    loader.parentElement.classList.add('active');
-    fetchData(serverLastModified);
-  }).catch(err => {
-    console.error('Cache check error:', err);
-    const stored = localStorage.getItem(CACHE_KEY);
-    const cacheData = stored ? JSON.parse(stored) : null;
-    if (cacheData && cacheData.data && cacheData.lastModified) {
-      console.log('Using cache due to server error');
-      searchHint.textContent = 'Данные загружены из кэша из-за ошибки сервера';
-      searchHint.style.color = 'var(--success)';
-      setTimeout(() => {
-        updateSearchHint();
-        searchHint.style.color = 'var(--text-secondary)';
-      }, 3000);
+
+  const stored = localStorage.getItem(CACHE_KEY);
+  const cacheData = stored ? JSON.parse(stored) : null;
+
+  if (cacheData && cacheData.data && cacheData.lastModified) {
+    const cacheTime = new Date(cacheData.lastModified).getTime();
+    const now = new Date().getTime();
+
+    if (now <= cacheTime + 432000000) { // 5 дней
       tenantData = cacheData.data;
       initCleanData();
       if (textInput.value) filterAndRender(textInput.value);
-    } else {
-      console.log('Fetching new data due to no cache');
-      loader.parentElement.classList.add('active');
-      fetchData(new Date(0));
+      isLoadingData = false;
+      return;
     }
-    isLoadingData = false;
-  });
+  }
+
+  loader.parentElement.classList.add('active');
+  fetchData(new Date());
+}
+
+// Fetch data from server
+function fetchData(lastModified) {
+  if (isLoadingData) return;
+
+  window.dataCb = resp => {
+    tenantData = resp.data || [];
+    initCleanData();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: tenantData,
+      lastModified: resp.lastModified
+    }));
+
+    cleanup('dataCb');
+    loader.parentElement.classList.remove('active');
+
+    if (textInput.value) filterAndRender(textInput.value);
+  };
+
+  const s = document.createElement('script');
+  s.src = `${SCRIPT_URL}?callback=dataCb`;
+  s.onerror = () => {
+    loader.parentElement.classList.remove('active');
+    searchHint.innerHTML = `
+      <div class="error-message" style="color: var(--error); display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-exclamation-triangle"></i>
+        Не удалось загрузить данные. <a href="#" style="color: var(--primary);" onclick="loadData()">Попробовать снова</a>
+      </div>`;
+  };
+  document.body.appendChild(s);
 }
 
 // Filter and render results
