@@ -8,6 +8,7 @@ let cleanTenantData = [];
 let currentMode = 'general';
 let recognition = null;
 let recognitionLanguage = 'en-US';
+let isLoadingData = false;
 
 // DOM elements
 const textInput = document.getElementById('textInput');
@@ -186,8 +187,6 @@ function updateSearchHint() {
 
 // Load data
 function loadData() {
-  let isLoadingData = false;
-
   if (isLoadingData) return;
   isLoadingData = true;
 
