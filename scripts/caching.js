@@ -15,17 +15,35 @@ function getLastModified() {
 
 // Fetch data from server
 function fetchData(lastModified) {
+  if (isLoadingData) {
+    console.log('fetchData already in progress, skipping');
+    return;
+  }
+  
   window.dataCb = resp => {
     tenantData = resp.data || [];
     initCleanData();
     
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       data: tenantData,
-      lastModified: lastModified
+      lastModified: lastModified.toISOString()
     }));
     
+    console.log('Saved to cache:', {
+      dataLength: tenantData.length,
+      lastModified: lastModified.toISOString()
+    });
+    
     cleanup('dataCb');
-    loader.style.display = 'none';
+    loader.parentElement.classList.remove('active');
+    isLoadingData = false;
+    
+    searchHint.textContent = 'Данные обновлены';
+    searchHint.style.color = 'var(--success)';
+    setTimeout(() => {
+      updateSearchHint();
+      searchHint.style.color = 'var(--text-secondary)';
+    }, 3000);
     
     if (textInput.value) filterAndRender(textInput.value);
   };
@@ -33,8 +51,14 @@ function fetchData(lastModified) {
   const s = document.createElement('script');
   s.src = `${SCRIPT_URL}?callback=dataCb`;
   s.onerror = () => {
-    loader.style.display = 'none';
-    searchHint.textContent = "Failed to load data. Please refresh the page.";
+    console.error('Failed to fetch data');
+    loader.parentElement.classList.remove('active');
+    isLoadingData = false;
+    searchHint.innerHTML = `
+      <div class="error-message" style="color: var(--error); display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-exclamation-triangle"></i>
+        Не удалось загрузить данные. <a href="#" style="color: var(--primary);" onclick="loadData()">Попробовать снова</a>
+      </div>`;
   };
   document.body.appendChild(s);
 }

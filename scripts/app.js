@@ -185,8 +185,16 @@ function updateSearchHint() {
 }
 
 // Load data
+let isLoadingData = false;
+
 function loadData() {
-  loader.style.display = 'flex';
+  if (isLoadingData) {
+    console.log('loadData already in progress, skipping');
+    return;
+  }
+  isLoadingData = true;
+  
+  console.log('Starting loadData');
   
   getLastModified().then(serverLastModified => {
     console.log('Server Last Modified:', serverLastModified.toISOString());
@@ -207,12 +215,16 @@ function loadData() {
       
       if (!isNaN(cacheTime) && !isNaN(serverTime) && serverTime <= cacheTime + 432000000) {
         console.log('Using cached data');
-        searchHint.textContent = 'Using cached data';
-        setTimeout(updateSearchHint, 3000);
+        searchHint.textContent = 'Данные загружены из кэша';
+        searchHint.style.color = 'var(--success)';
+        setTimeout(() => {
+          updateSearchHint();
+          searchHint.style.color = 'var(--text-secondary)';
+        }, 3000);
         tenantData = cacheData.data;
         initCleanData();
-        loader.style.display = 'none';
         if (textInput.value) filterAndRender(textInput.value);
+        isLoadingData = false;
         return;
       } else {
         console.log('Cache invalid, fetching new data');
@@ -221,6 +233,7 @@ function loadData() {
       console.log('No valid cache found');
     }
     
+    loader.parentElement.classList.add('active');
     fetchData(serverLastModified);
   }).catch(err => {
     console.error('Cache check error:', err);
@@ -228,15 +241,21 @@ function loadData() {
     const cacheData = stored ? JSON.parse(stored) : null;
     if (cacheData && cacheData.data && cacheData.lastModified) {
       console.log('Using cache due to server error');
-      searchHint.textContent = 'Using cached data due to server error';
-      setTimeout(updateSearchHint, 3000);
+      searchHint.textContent = 'Данные загружены из кэша из-за ошибки сервера';
+      searchHint.style.color = 'var(--success)';
+      setTimeout(() => {
+        updateSearchHint();
+        searchHint.style.color = 'var(--text-secondary)';
+      }, 3000);
       tenantData = cacheData.data;
       initCleanData();
-      loader.style.display = 'none';
       if (textInput.value) filterAndRender(textInput.value);
     } else {
+      console.log('Fetching new data due to no cache');
+      loader.parentElement.classList.add('active');
       fetchData(new Date(0));
     }
+    isLoadingData = false;
   });
 }
 
