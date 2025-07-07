@@ -189,26 +189,54 @@ function loadData() {
   loader.style.display = 'flex';
   
   getLastModified().then(serverLastModified => {
+    console.log('Server Last Modified:', serverLastModified.toISOString());
     const stored = localStorage.getItem(CACHE_KEY);
+    console.log('Stored Cache:', stored);
+    
     const cacheData = stored ? JSON.parse(stored) : null;
+    console.log('Parsed Cache Data:', cacheData);
     
     if (cacheData && cacheData.data && cacheData.lastModified) {
       const cacheTime = new Date(cacheData.lastModified).getTime();
       const serverTime = serverLastModified.getTime();
       
-      if (serverTime <= cacheTime + 432000000) {
+      console.log('Server Time (ms):', serverTime);
+      console.log('Cache Time (ms):', cacheTime);
+      console.log('Time Difference (ms):', serverTime - cacheTime);
+      console.log('Is Cache Valid?', serverTime <= cacheTime + 432000000);
+      
+      if (!isNaN(cacheTime) && !isNaN(serverTime) && serverTime <= cacheTime + 432000000) {
+        console.log('Using cached data');
+        searchHint.textContent = 'Using cached data';
+        setTimeout(updateSearchHint, 3000);
         tenantData = cacheData.data;
         initCleanData();
         loader.style.display = 'none';
         if (textInput.value) filterAndRender(textInput.value);
         return;
+      } else {
+        console.log('Cache invalid, fetching new data');
       }
+    } else {
+      console.log('No valid cache found');
     }
     
     fetchData(serverLastModified);
   }).catch(err => {
     console.error('Cache check error:', err);
-    fetchData(new Date(0));
+    const stored = localStorage.getItem(CACHE_KEY);
+    const cacheData = stored ? JSON.parse(stored) : null;
+    if (cacheData && cacheData.data && cacheData.lastModified) {
+      console.log('Using cache due to server error');
+      searchHint.textContent = 'Using cached data due to server error';
+      setTimeout(updateSearchHint, 3000);
+      tenantData = cacheData.data;
+      initCleanData();
+      loader.style.display = 'none';
+      if (textInput.value) filterAndRender(textInput.value);
+    } else {
+      fetchData(new Date(0));
+    }
   });
 }
 
