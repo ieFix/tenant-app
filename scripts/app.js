@@ -8,7 +8,6 @@ let cleanTenantData = [];
 let currentMode = 'general';
 let recognition = null;
 let recognitionLanguage = 'en-US';
-let isLoadingData = false;
 
 // DOM elements
 const textInput = document.getElementById('textInput');
@@ -187,59 +186,31 @@ function updateSearchHint() {
 
 // Load data
 function loadData() {
-  if (isLoadingData) return;
-  isLoadingData = true;
-
-  const stored = localStorage.getItem(CACHE_KEY);
-  const cacheData = stored ? JSON.parse(stored) : null;
-
-  if (cacheData && cacheData.data && cacheData.lastModified) {
-    const cacheTime = new Date(cacheData.lastModified).getTime();
-    const now = new Date().getTime();
-
-    if (now <= cacheTime + 432000000) { // 5 дней
-      tenantData = cacheData.data;
-      initCleanData();
-      if (textInput.value) filterAndRender(textInput.value);
-      isLoadingData = false;
-      return;
+  loader.style.display = 'flex';
+  
+  getLastModified().then(serverLastModified => {
+    const stored = localStorage.getItem(CACHE_KEY);
+    const cacheData = stored ? JSON.parse(stored) : null;
+    
+    if (cacheData && cacheData.data && cacheData.lastModified) {
+      const cacheTime = new Date(cacheData.lastModified).getTime();
+      const serverTime = serverLastModified.getTime();
+      
+      // Проверка кеша на 5 дней (432000000 мс)
+      if (serverTime <= cacheTime + 432000000) {
+        tenantData = cacheData.data;
+        initCleanData();
+        loader.style.display = 'none';
+        if (textInput.value) filterAndRender(textInput.value);
+        return;
+      }
     }
-  }
-
-  loader.parentElement.classList.add('active');
-  fetchData(new Date());
-}
-
-// Fetch data from server
-function fetchData(lastModified) {
-  if (isLoadingData) return;
-
-  window.dataCb = resp => {
-    tenantData = resp.data || [];
-    initCleanData();
-
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      data: tenantData,
-      lastModified: resp.lastModified
-    }));
-
-    cleanup('dataCb');
-    loader.parentElement.classList.remove('active');
-
-    if (textInput.value) filterAndRender(textInput.value);
-  };
-
-  const s = document.createElement('script');
-  s.src = `${SCRIPT_URL}?callback=dataCb`;
-  s.onerror = () => {
-    loader.parentElement.classList.remove('active');
-    searchHint.innerHTML = `
-      <div class="error-message" style="color: var(--error); display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-exclamation-triangle"></i>
-        Не удалось загрузить данные. <a href="#" style="color: var(--primary);" onclick="loadData()">Попробовать снова</a>
-      </div>`;
-  };
-  document.body.appendChild(s);
+    
+    fetchData();
+  }).catch(err => {
+    console.error('Cache check error:', err);
+    fetchData();
+  });
 }
 
 // Filter and render results
